@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% load formatters %}
 
-{% block title %}Detalhe do objetivo | Financas{% endblock %}
+{% block title %}Detalhe do objetivo | Control{% endblock %}
 {% block page_header %}{% endblock %}
 {% block main_class %}px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-36{% endblock %}
 
@@ -10,7 +11,7 @@
         <div>
             <h1 class="app-title">{{ goal.name }}</h1>
             <p class="app-subtitle">
-                Meta: R$ {{ goal.target_amount|floatformat:"2g" }}
+                Meta: {{ goal.target_amount|brl }}
                 {% if goal.target_date %}
                     ate {{ goal.target_date|date:"d/m/Y" }}
                 {% endif %}
@@ -25,10 +26,10 @@
             <div class="goal-progress-fill" style="width: {{ goal.progress_percent|floatformat:2 }}%;"></div>
         </div>
         <div class="flex items-center justify-between gap-3 text-sm">
-            <p class="app-item-value">R$ {{ goal.total_saved|floatformat:"2g" }}</p>
+            <p class="app-item-value">{{ goal.total_saved|brl }}</p>
             <p class="app-item-meta">{{ goal.progress_percent|floatformat:2 }}%</p>
         </div>
-        <p class="app-item-meta">Faltam R$ {{ goal.remaining_amount|floatformat:"2g" }}</p>
+        <p class="app-item-meta">Faltam {{ goal.remaining_amount|brl }}</p>
     </article>
 
     <article class="card space-y-4">
@@ -53,7 +54,7 @@
                             <p class="app-item-title">{{ entry.description|default:"Aporte" }}</p>
                             <p class="app-item-meta">{{ entry.date|date:"d/m/Y" }}</p>
                         </div>
-                        <p class="app-item-value text-emerald-400">+ R$ {{ entry.amount|floatformat:2 }}</p>
+                        <p class="app-item-value text-emerald-400">+ {{ entry.amount|brl }}</p>
                     </article>
                 {% endfor %}
             </div>
@@ -63,4 +64,6 @@
     </section>
 </section>
 {% endblock %}
+
+
 

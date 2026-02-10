@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% load formatters %}
 
-{% block title %}Objetivos | Financas{% endblock %}
+{% block title %}Objetivos | Control{% endblock %}
 {% block page_header %}{% endblock %}
 {% block main_class %}px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-36{% endblock %}
 
@@ -42,11 +43,11 @@
                     </div>
 
                     <div class="flex items-center justify-between gap-3 text-sm">
-                        <p class="app-item-meta">R$ {{ goal.total_saved|floatformat:"2g" }} / R$ {{ goal.target_amount|floatformat:"2g" }}</p>
+                        <p class="app-item-meta">{{ goal.total_saved|brl }} / {{ goal.target_amount|brl }}</p>
                         <p class="app-item-meta">{{ goal.progress_percent|floatformat:2 }}%</p>
                     </div>
 
-                    <p class="app-item-meta">Faltam R$ {{ goal.remaining_amount|floatformat:"2g" }}</p>
+                    <p class="app-item-meta">Faltam {{ goal.remaining_amount|brl }}</p>
 
                     <div class="grid grid-cols-2 gap-2">
                         <a href="{% url 'goals:detail' goal.pk %}" class="app-btn-secondary text-center">Lancamentos</a>
@@ -61,4 +62,6 @@
     {% endif %}
 </section>
 {% endblock %}
+
+
 

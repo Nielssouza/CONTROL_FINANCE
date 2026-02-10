@@ -2,10 +2,11 @@ import json
 from datetime import date
 from decimal import Decimal
 
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.formats import date_format
@@ -14,7 +15,7 @@ from django.views.generic import CreateView, DeleteView, TemplateView, UpdateVie
 from accounts.models import Account
 from common.mixins import UserAssignMixin, UserQuerySetMixin
 from transactions.forms import QuickTransactionForm, StatementFilterForm, TransactionForm
-from transactions.models import Transaction
+from transactions.models import ClosedMonth, Transaction
 
 
 class TransactionFormKwargsMixin:
@@ -24,29 +25,227 @@ class TransactionFormKwargsMixin:
         return kwargs
 
 
-class TransactionCreateView(UserAssignMixin, TransactionFormKwargsMixin, CreateView):
+class MonthLockMixin:
+    unlock_field_name = "unlock_password"
+    closed_month_error = "Mes fechado: informe sua senha para confirmar esta alteracao."
+
+    def is_month_closed(self, target_date):
+        return ClosedMonth.objects.filter(
+            user=self.request.user,
+            is_closed=True,
+            year=target_date.year,
+            month=target_date.month,
+        ).exists()
+
+    def queryset_has_closed_month(self, queryset):
+        month_pairs = set(queryset.values_list("date__year", "date__month").distinct())
+        if not month_pairs:
+            return False
+
+        closed_pairs = set(
+            ClosedMonth.objects.filter(user=self.request.user, is_closed=True).values_list(
+                "year", "month"
+            )
+        )
+        return any(pair in closed_pairs for pair in month_pairs)
+
+    def is_unlock_password_valid(self):
+        password = (self.request.POST.get(self.unlock_field_name) or "").strip()
+        if not password:
+            return False
+        return self.request.user.check_password(password)
+
+    def ensure_month_unlocked(self, queryset, form=None):
+        if not self.queryset_has_closed_month(queryset):
+            return True
+
+        if self.is_unlock_password_valid():
+            return True
+
+        if form is not None and self.unlock_field_name in form.fields:
+            form.add_error(self.unlock_field_name, self.closed_month_error)
+        else:
+            messages.error(self.request, self.closed_month_error)
+        return False
+
+
+class RecurrenceScopeMixin:
+    SCOPE_CURRENT = "current"
+    SCOPE_ALL = "all"
+
+    def get_scope(self):
+        value = (
+            self.request.POST.get("scope")
+            or self.request.GET.get("scope")
+            or self.SCOPE_CURRENT
+        )
+        value = (value or "").strip().lower()
+        if value not in {self.SCOPE_CURRENT, self.SCOPE_ALL}:
+            return self.SCOPE_CURRENT
+        return value
+
+    def get_scope_options(self):
+        return [
+            {"value": self.SCOPE_CURRENT, "label": "Somente esta transacao"},
+            {"value": self.SCOPE_ALL, "label": "Todas pendentes"},
+        ]
+
+    def get_related_occurrences_queryset(self, reference_transaction):
+        queryset = Transaction.objects.filter(user=self.request.user).exclude(
+            pk=reference_transaction.pk
+        )
+
+        return queryset.filter(
+            transaction_type=reference_transaction.transaction_type,
+            amount=reference_transaction.amount,
+            account=reference_transaction.account,
+            destination_account=reference_transaction.destination_account,
+            category=reference_transaction.category,
+            description=reference_transaction.description,
+            recurrence_type=reference_transaction.recurrence_type,
+            recurrence_interval=reference_transaction.recurrence_interval,
+            installment_count=reference_transaction.installment_count,
+            is_cleared=False,
+        )
+
+    def get_scope_queryset(self, reference_transaction, scope):
+        ids = [reference_transaction.pk]
+        if scope == self.SCOPE_ALL:
+            ids.extend(
+                self.get_related_occurrences_queryset(reference_transaction).values_list(
+                    "pk", flat=True
+                )
+            )
+        return Transaction.objects.filter(user=self.request.user, pk__in=ids)
+
+    def update_related_occurrences(self, reference_transaction, updated_transaction):
+        return self.get_related_occurrences_queryset(reference_transaction).update(
+            transaction_type=updated_transaction.transaction_type,
+            amount=updated_transaction.amount,
+            account=updated_transaction.account,
+            destination_account=updated_transaction.destination_account,
+            category=updated_transaction.category,
+            description=updated_transaction.description,
+            is_cleared=updated_transaction.is_cleared,
+            recurrence_type=updated_transaction.recurrence_type,
+            recurrence_interval=updated_transaction.recurrence_interval,
+            installment_count=updated_transaction.installment_count,
+        )
+
+    def delete_related_occurrences(self, reference_transaction):
+        deleted_count, _ = self.get_related_occurrences_queryset(
+            reference_transaction
+        ).delete()
+        return deleted_count
+
+
+class TransactionCreateView(
+    MonthLockMixin, UserAssignMixin, TransactionFormKwargsMixin, CreateView
+):
     model = Transaction
     form_class = TransactionForm
     template_name = "transactions/transaction_form.html"
     success_url = reverse_lazy("transactions:statement")
 
     def form_valid(self, form):
+        target_date = form.cleaned_data.get("date")
+        if target_date and self.is_month_closed(target_date) and not self.is_unlock_password_valid():
+            form.add_error(self.unlock_field_name, self.closed_month_error)
+            return self.form_invalid(form)
+
         response = super().form_valid(form)
         self.object.generate_future_occurrences()
         return response
 
 
-class TransactionUpdateView(UserQuerySetMixin, TransactionFormKwargsMixin, UpdateView):
+class TransactionUpdateView(
+    UserQuerySetMixin,
+    MonthLockMixin,
+    RecurrenceScopeMixin,
+    TransactionFormKwargsMixin,
+    UpdateView,
+):
     model = Transaction
     form_class = TransactionForm
     template_name = "transactions/transaction_form.html"
     success_url = reverse_lazy("transactions:statement")
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["scope_options"] = self.get_scope_options()
+        context["selected_scope"] = self.get_scope()
+        return context
 
-class TransactionDeleteView(UserQuerySetMixin, DeleteView):
+    def form_valid(self, form):
+        scope = self.get_scope()
+        reference_transaction = Transaction.objects.get(pk=self.object.pk, user=self.request.user)
+        target_queryset = self.get_scope_queryset(reference_transaction, scope)
+
+        if not self.ensure_month_unlocked(target_queryset, form=form):
+            return self.form_invalid(form)
+
+        response = super().form_valid(form)
+
+        if scope == self.SCOPE_ALL:
+            updated_count = self.update_related_occurrences(
+                reference_transaction,
+                self.object,
+            )
+            if updated_count:
+                messages.success(
+                    self.request,
+                    f"Alteracao aplicada em {updated_count + 1} transacoes da recorrencia.",
+                )
+        return response
+
+
+class TransactionDeleteView(
+    UserQuerySetMixin,
+    MonthLockMixin,
+    RecurrenceScopeMixin,
+    DeleteView,
+):
     model = Transaction
     template_name = "transactions/transaction_confirm_delete.html"
     success_url = reverse_lazy("transactions:statement")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["scope_options"] = self.get_scope_options()
+        context["selected_scope"] = self.get_scope()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        scope = self.get_scope()
+        target_queryset = self.get_scope_queryset(self.object, scope)
+
+        if target_queryset.filter(is_cleared=True).exists():
+            messages.error(
+                request,
+                "Lancamentos baixados nao podem ser excluidos.",
+            )
+            context = self.get_context_data(object=self.object)
+            return self.render_to_response(context)
+
+        if not self.ensure_month_unlocked(target_queryset):
+            context = self.get_context_data(object=self.object)
+            return self.render_to_response(context)
+
+        related_deleted = 0
+        if scope == self.SCOPE_ALL:
+            related_deleted = self.delete_related_occurrences(self.object)
+
+        success_url = self.get_success_url()
+        self.object.delete()
+
+        if scope == self.SCOPE_ALL:
+            messages.success(
+                request,
+                f"Exclusao aplicada em {related_deleted + 1} transacoes da recorrencia.",
+            )
+
+        return HttpResponseRedirect(success_url)
 
 
 class StatementViewBase(LoginRequiredMixin, TemplateView):
@@ -138,10 +337,10 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
         )
         total_income = available_transactions.filter(
             transaction_type=Transaction.TransactionType.INCOME
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))['total']
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
         total_expense = available_transactions.filter(
             transaction_type=Transaction.TransactionType.EXPENSE
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))['total']
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
         current_balance = initial_total + total_income - total_expense
 
         monthly_queryset = Transaction.objects.filter(
@@ -162,10 +361,10 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
 
         monthly_income = monthly_queryset.filter(
             transaction_type=Transaction.TransactionType.INCOME
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))['total']
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
         monthly_expense = monthly_queryset.filter(
             transaction_type=Transaction.TransactionType.EXPENSE
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))['total']
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
         return current_balance, monthly_income - monthly_expense
 
@@ -212,12 +411,22 @@ class StatementPartialView(StatementViewBase):
     template_name = "transactions/partials/statement_list.html"
 
 
-class QuickTransactionCreateView(LoginRequiredMixin, TransactionFormKwargsMixin, CreateView):
+class QuickTransactionCreateView(
+    MonthLockMixin,
+    LoginRequiredMixin,
+    TransactionFormKwargsMixin,
+    CreateView,
+):
     model = Transaction
     form_class = QuickTransactionForm
     template_name = "transactions/partials/quick_add_modal.html"
 
     def form_valid(self, form):
+        target_date = form.cleaned_data.get("date")
+        if target_date and self.is_month_closed(target_date) and not self.is_unlock_password_valid():
+            form.add_error(self.unlock_field_name, self.closed_month_error)
+            return self.form_invalid(form)
+
         form.instance.user = self.request.user
         self.object = form.save()
         self.object.generate_future_occurrences()
@@ -229,4 +438,3 @@ class QuickTransactionCreateView(LoginRequiredMixin, TransactionFormKwargsMixin,
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
-

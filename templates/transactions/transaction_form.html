@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Transacao | Financas{% endblock %}
+{% block title %}Transacao | Control{% endblock %}
 
 {% block content %}
 <section class="app-page space-y-4">
@@ -11,10 +11,60 @@
 
     <form method="post" class="card space-y-4">
         {% include "partials/form_fields.html" %}
+
+        {% if object %}
+            <div class="space-y-2 rounded-2xl border border-slate-600/50 bg-slate-900/35 p-3">
+                <p class="app-field-label">Aplicar alteracao em</p>
+                {% for opt in scope_options %}
+                    <label class="flex items-center gap-2 text-sm text-slate-200">
+                        <input
+                            type="radio"
+                            name="scope"
+                            value="{{ opt.value }}"
+                            {% if selected_scope == opt.value %}checked{% endif %}
+                        >
+                        <span>{{ opt.label }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        {% endif %}
+
         <div class="grid grid-cols-2 gap-2">
             <a href="{% url 'transactions:statement' %}" class="app-btn-secondary text-center">Cancelar</a>
             <button type="submit" class="app-btn-primary">Salvar</button>
         </div>
     </form>
 </section>
+{% endblock %}{% block extra_js %}
+<script>
+    (function () {
+        const form = document.querySelector('form[method="post"].card');
+        if (!form) return;
+
+        const recurrenceField = form.querySelector('[name="recurrence_type"]');
+        const installmentField = form.querySelector('[name="installment_count"]');
+        const intervalField = form.querySelector('[name="recurrence_interval"]');
+
+        if (!recurrenceField) return;
+
+        const installmentWrapper = installmentField ? installmentField.closest("div.space-y-1") : null;
+        const intervalWrapper = intervalField ? intervalField.closest("div.space-y-1") : null;
+
+        const toggleFieldsMain = () => {
+            const isInstallment = recurrenceField.value === "installment";
+            const showInterval = recurrenceField.value !== "fixed";
+
+            if (installmentWrapper) {
+                installmentWrapper.classList.toggle("hidden", !isInstallment);
+                if (!isInstallment && installmentField) installmentField.value = "";
+            }
+            if (intervalWrapper) {
+                intervalWrapper.classList.toggle("hidden", !showInterval);
+            }
+        };
+
+        recurrenceField.addEventListener('change', toggleFieldsMain);
+        toggleFieldsMain();
+    })();
+</script>
 {% endblock %}

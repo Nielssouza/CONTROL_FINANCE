@@ -26,6 +26,17 @@ class TransactionForm(forms.ModelForm):
         widget=forms.DateInput(attrs={"type": "date"}),
     )
 
+    unlock_password = forms.CharField(
+        label="Senha para mes fechado",
+        required=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "current-password",
+                "placeholder": "Preencha apenas para alterar mes fechado",
+            }
+        ),
+        help_text="Obrigatoria somente quando o mes estiver fechado.",
+    )
     class Meta:
         model = Transaction
         fields = (
@@ -62,6 +73,9 @@ class TransactionForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         self.instance.user = user
+
+        if "recurrence_type" in self.fields:
+            self.fields["recurrence_type"].choices = [(Transaction.RecurrenceType.FIXED, "Fixa"), (Transaction.RecurrenceType.INSTALLMENT, "Parcelado")]
 
         if self.instance and self.instance.pk and "amount" in self.fields:
             self.initial["amount"] = f"{self.instance.amount:.2f}"
@@ -121,6 +135,9 @@ class TransactionForm(forms.ModelForm):
         transaction_type = cleaned_data.get("transaction_type")
         recurrence_type = cleaned_data.get("recurrence_type")
 
+        if recurrence_type not in {Transaction.RecurrenceType.FIXED, Transaction.RecurrenceType.INSTALLMENT}:
+            self.add_error("recurrence_type", "Recorrencia invalida.")
+
         if transaction_type == Transaction.TransactionType.TRANSFER:
             cleaned_data["category"] = None
         else:
@@ -159,9 +176,6 @@ class QuickTransactionForm(TransactionForm):
         ]
         self.fields["recurrence_type"].choices = [
             (Transaction.RecurrenceType.FIXED, "Fixa"),
-            (Transaction.RecurrenceType.MONTHLY, "Mensal"),
-            (Transaction.RecurrenceType.QUARTERLY, "Trimestral"),
-            (Transaction.RecurrenceType.YEARLY, "Anual"),
             (Transaction.RecurrenceType.INSTALLMENT, "Parcelado"),
         ]
 

@@ -1,6 +1,7 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
+{% load formatters %}
 
-{% block title %}Contas | Financas{% endblock %}
+{% block title %}Contas | Control{% endblock %}
 {% block page_header %}{% endblock %}
 {% block main_class %}px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-36{% endblock %}
 
@@ -30,7 +31,7 @@
                             <span class="badge badge-expense">Inativa</span>
                         {% endif %}
                     </div>
-                    <p class="app-item-value mt-3">Saldo: R$ {{ account.balance|floatformat:2 }}</p>
+                    <p class="app-item-value mt-3">Saldo: {{ account.balance|brl }}</p>
                     <div class="app-inline-actions mt-3">
                         <a href="{% url 'accounts:update' account.pk %}" class="app-link-edit">Editar</a>
                         <a href="{% url 'accounts:delete' account.pk %}" class="app-link-danger">Excluir</a>
@@ -45,3 +46,4 @@
     {% endif %}
 </section>
 {% endblock %}
+

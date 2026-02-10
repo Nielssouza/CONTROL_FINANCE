@@ -7,8 +7,8 @@
     <meta name="theme-color" content="#6d28d9">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Financas">
-    <title>{% block title %}Financas Pessoais{% endblock %}</title>
+    <meta name="apple-mobile-web-app-title" content="Control">
+    <title>{% block title %}Control{% endblock %}</title>
 
     {% if not app_debug %}
     <link rel="manifest" href="{% url 'manifest' %}">
@@ -38,7 +38,7 @@
         {% block page_header %}
         <header class="app-header">
             <div class="flex items-center justify-between">
-                <a href="{% url 'dashboard:home' %}" class="app-brand">Financas</a>
+                <a href="{% url 'dashboard:home' %}" class="app-brand">Control</a>
                 <div class="flex items-center gap-2">
                     {% if user.is_authenticated %}
                         <span class="app-user-chip">{{ user.username }}</span>
@@ -47,7 +47,6 @@
                             <button class="app-mini-btn" type="submit">Sair</button>
                         </form>
                     {% else %}
-                        <a href="{% url 'users:login' %}" class="app-mini-btn app-mini-btn-primary">Entrar</a>
                     {% endif %}
                 </div>
             </div>
@@ -166,3 +165,4 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+

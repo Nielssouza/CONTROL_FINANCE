@@ -53,17 +53,18 @@ class DashboardContextMixin(LoginRequiredMixin):
         except (TypeError, ValueError):
             return today.replace(day=1)
 
-    def _build_month_options(self, current_month: date):
-        options = []
-        for offset in range(-24, 25):
-            month_date = self._shift_month(current_month, offset)
-            options.append(
-                {
-                    "value": f"{month_date.year:04d}-{month_date.month:02d}",
-                    "label": f"{MONTH_NAMES_PT.get(month_date.month, '')} {month_date.year}",
-                }
-            )
-        return options
+    def _build_month_navigation(self, selected_month: date):
+        prev_month = self._shift_month(selected_month, -1)
+        next_month = self._shift_month(selected_month, 1)
+
+        prev_params = self.request.GET.copy()
+        prev_params["month"] = f"{prev_month.year:04d}-{prev_month.month:02d}"
+
+        next_params = self.request.GET.copy()
+        next_params["month"] = f"{next_month.year:04d}-{next_month.month:02d}"
+
+        selected_label = f"{MONTH_NAMES_PT.get(selected_month.month, '')} {selected_month.year}"
+        return selected_label, prev_params.urlencode(), next_params.urlencode()
 
     def _build_expense_chart(self, current_month_transactions, monthly_expense):
         expense_rows = list(
@@ -210,20 +211,19 @@ class DashboardContextMixin(LoginRequiredMixin):
             goal_progress = active_goal.progress_percent
             goal_remaining = active_goal.remaining_amount
 
-        month_name = MONTH_NAMES_PT.get(selected_month.month, "")
-        selected_month_value = f"{selected_month.year:04d}-{selected_month.month:02d}"
-        month_options = self._build_month_options(selected_month)
+        selected_month_label, prev_month_query, next_month_query = self._build_month_navigation(
+            selected_month
+        )
 
         return {
             "total_balance": initial_total + total_income - total_expense,
             "monthly_income": monthly_income,
             "monthly_expense": monthly_expense,
             "latest_transactions": latest_transactions,
-            "month_label": f"{month_name} {selected_month.year}",
-            "month_name": month_name,
+            "selected_month_label": selected_month_label,
+            "prev_month_query": prev_month_query,
+            "next_month_query": next_month_query,
             "today": today,
-            "selected_month_value": selected_month_value,
-            "month_options": month_options,
             "pending_expense_total": pending_expense_total,
             "pending_expense_count": pending_expense_count,
             "due_notifications": due_notifications,

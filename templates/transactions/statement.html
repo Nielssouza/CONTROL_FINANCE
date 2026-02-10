@@ -1,6 +1,7 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
+{% load formatters %}
 
-{% block title %}Transacoes | Financas{% endblock %}
+{% block title %}Transacoes | Control{% endblock %}
 {% block body_class %}transactions-body{% endblock %}
 {% block shell_class %}transactions-shell{% endblock %}
 {% block page_header %}{% endblock %}
@@ -76,12 +77,12 @@
         <div class="txn-balance-grid">
             <div class="txn-balance-item">
                 <span class="txn-balance-label">Saldo atual</span>
-                <strong class="txn-balance-value">R$ {{ current_balance|floatformat:2 }}</strong>
+                <strong class="txn-balance-value">{{ current_balance|brl }}</strong>
             </div>
             <div class="txn-balance-divider"></div>
             <div class="txn-balance-item">
                 <span class="txn-balance-label">Balanco mensal</span>
-                <strong class="txn-balance-value">R$ {{ monthly_balance|floatformat:2 }}</strong>
+                <strong class="txn-balance-value">{{ monthly_balance|brl }}</strong>
             </div>
         </div>
     </article>
@@ -106,4 +107,6 @@
     </div>
 </section>
 {% endblock %}
+
+
 

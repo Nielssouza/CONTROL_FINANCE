@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% load formatters %}
 
-{% block title %}Principal | Financas{% endblock %}
+{% block title %}Principal | Control{% endblock %}
 {% block body_class %}dash-body{% endblock %}
 {% block shell_class %}dash-shell{% endblock %}
 {% block page_header %}{% endblock %}
@@ -109,7 +110,7 @@
                                         <p class="dash-due-sub">{{ item.account.name }}{% if item.category %} | {{ item.category.name }}{% endif %}</p>
                                     </div>
                                     <div class="dash-due-right">
-                                        <span class="dash-due-amount">R$ {{ item.amount|floatformat:2 }}</span>
+                                        <span class="dash-due-amount">{{ item.amount|brl }}</span>
                                         {% if item.date < today %}
                                             <span class="dash-due-status dash-due-status-overdue">Atrasada</span>
                                         {% elif item.date == today %}
@@ -128,18 +129,11 @@
                     <a href="{% url 'transactions:statement' %}" class="dash-due-link">Abrir transacoes</a>
                 </div>
             </div>
-<form method="get" class="dash-month-form" aria-label="Selecionar mes">
-                <div class="dash-month-pill">
-                    <select name="month" class="dash-month-select" onchange="this.form.submit()" aria-label="Mes">
-                        {% for option in month_options %}
-                            <option value="{{ option.value }}" {% if option.value == selected_month_value %}selected{% endif %}>{{ option.label }}</option>
-                        {% endfor %}
-                    </select>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="dash-month-chevron" aria-hidden="true">
-                        <path d="M6 9l6 6 6-6"></path>
-                    </svg>
-                </div>
-            </form>
+<div class="dash-month-nav" aria-label="Navegacao de mes">
+                <a href="?{{ prev_month_query }}" class="dash-month-arrow" aria-label="Mes anterior">&lsaquo;</a>
+                <p class="dash-month-title">{{ selected_month_label }}</p>
+                <a href="?{{ next_month_query }}" class="dash-month-arrow" aria-label="Mes seguinte">&rsaquo;</a>
+            </div>
             <div class="dash-user-menu" id="dash-user-menu">
                 <button
                     type="button"
@@ -171,7 +165,7 @@
         </div>
 
         <p class="dash-balance-label">Saldo atual em contas</p>
-        <h1 class="dash-balance-value" data-sensitive-value data-mask="R$ ****">R$ {{ total_balance|floatformat:2 }}</h1>
+        <h1 class="dash-balance-value" data-sensitive-value data-mask="R$ ****">{{ total_balance|brl }}</h1>
 
         <button
             type="button"
@@ -200,7 +194,7 @@
                 </span>
                 <div>
                     <p class="dash-flow-label">Receitas</p>
-                    <p class="dash-flow-value dash-flow-value-income" data-sensitive-value data-mask="R$ ****">R$ {{ monthly_income|floatformat:2 }}</p>
+                    <p class="dash-flow-value dash-flow-value-income" data-sensitive-value data-mask="R$ ****">{{ monthly_income|brl }}</p>
                 </div>
             </div>
 
@@ -213,7 +207,7 @@
                 </span>
                 <div>
                     <p class="dash-flow-label">Despesas</p>
-                    <p class="dash-flow-value dash-flow-value-expense" data-sensitive-value data-mask="R$ ****">R$ {{ monthly_expense|floatformat:2 }}</p>
+                    <p class="dash-flow-value dash-flow-value-expense" data-sensitive-value data-mask="R$ ****">{{ monthly_expense|brl }}</p>
                 </div>
             </div>
         </div>
@@ -230,7 +224,7 @@
             </div>
             <span class="dash-alert-badge">{{ pending_expense_count }}</span>
             <p class="dash-alert-title">Despesas pendentes</p>
-            <p class="dash-alert-amount" data-sensitive-value data-mask="R$ ****">R$ {{ pending_expense_total|floatformat:2 }}</p>
+            <p class="dash-alert-amount" data-sensitive-value data-mask="R$ ****">{{ pending_expense_total|brl }}</p>
         </article>
     </section>
 
@@ -248,7 +242,7 @@
                         <div class="dash-legend-item">
                             <span class="dash-legend-dot" style="background-color: {{ item.color }};"></span>
                             <span class="dash-legend-name">{{ item.name }}</span>
-                            <span class="dash-legend-amount" data-sensitive-value data-mask="R$ ****">R$ {{ item.total|floatformat:2 }}</span>
+                            <span class="dash-legend-amount" data-sensitive-value data-mask="R$ ****">{{ item.total|brl }}</span>
                         </div>
                     {% endfor %}
                 {% else %}
@@ -290,8 +284,8 @@
                     </div>
                 </div>
 
-                <p class="dash-goal-values" data-sensitive-value data-mask="R$ ****/R$ ****">R$ {{ goal_saved|floatformat:"2g" }}/R$ {{ goal_target|floatformat:"2g" }}</p>
-                <p class="dash-goal-remaining" data-sensitive-value data-mask="Faltam R$ ****">Faltam R$ {{ goal_remaining|floatformat:"2g" }}</p>
+                <p class="dash-goal-values" data-sensitive-value data-mask="R$ ****/R$ ****">{{ goal_saved|brl }}/{{ goal_target|brl }}</p>
+                <p class="dash-goal-remaining" data-sensitive-value data-mask="Faltam R$ ****">Faltam {{ goal_remaining|brl }}</p>
                 <a href="{% url 'goals:detail' active_goal.pk %}" class="dash-goal-more">Ver mais</a>
             {% else %}
                 <p class="dash-goal-title">Nenhum objetivo ativo</p>
@@ -312,134 +306,104 @@
 {% endblock %}
 
 {% block extra_js %}
-
-<script>
-    (function () {
-        const dueMenu = document.getElementById("dash-due-menu");
-        const dueMenuToggle = document.getElementById("dash-due-menu-toggle");
-        const dueMenuPanel = document.getElementById("dash-due-menu-panel");
-
-        if (!dueMenu || !dueMenuToggle || !dueMenuPanel) {
-            return;
-        }
-
-        const closeDueMenu = () => {
-            dueMenuPanel.classList.add("hidden");
-            dueMenuToggle.setAttribute("aria-expanded", "false");
-        };
-
-        dueMenuToggle.addEventListener("click", function (event) {
-            event.stopPropagation();
-            const isOpen = !dueMenuPanel.classList.contains("hidden");
-            if (isOpen) {
-                closeDueMenu();
-            } else {
-                dueMenuPanel.classList.remove("hidden");
-                dueMenuToggle.setAttribute("aria-expanded", "true");
-            }
-        });
-
-        document.addEventListener("click", function (event) {
-            if (!dueMenu.contains(event.target)) {
-                closeDueMenu();
-            }
-        });
-
-        document.addEventListener("keydown", function (event) {
-            if (event.key === "Escape") {
-                closeDueMenu();
-            }
-        });
-    })();
-</script>
 <script>
     (function () {
         const toggleButton = document.getElementById("dash-visibility-toggle");
-        if (!toggleButton) {
-            return;
-        }
+        if (toggleButton) {
+            const STORAGE_KEY = "finance_values_hidden";
+            const targets = Array.from(document.querySelectorAll("[data-sensitive-value]"));
+            const openIcon = toggleButton.querySelector(".dash-eye-open");
+            const closedIcon = toggleButton.querySelector(".dash-eye-closed");
 
-        const STORAGE_KEY = "finance_values_hidden";
-        const targets = Array.from(document.querySelectorAll("[data-sensitive-value]"));
-        const openIcon = toggleButton.querySelector(".dash-eye-open");
-        const closedIcon = toggleButton.querySelector(".dash-eye-closed");
-
-        if (!targets.length) {
-            return;
-        }
-
-        targets.forEach((element) => {
-            if (!element.dataset.originalText) {
-                element.dataset.originalText = element.textContent.trim();
-            }
-        });
-
-        const applyState = (hidden) => {
             targets.forEach((element) => {
-                const originalText = element.dataset.originalText || "";
-                const mask = element.dataset.mask || "****";
-                element.textContent = hidden ? mask : originalText;
+                if (!element.dataset.originalText) {
+                    element.dataset.originalText = element.textContent.trim();
+                }
             });
 
-            toggleButton.setAttribute("aria-pressed", hidden ? "true" : "false");
-            toggleButton.setAttribute("aria-label", hidden ? "Mostrar valores" : "Ocultar valores");
+            const applyState = (hidden) => {
+                targets.forEach((element) => {
+                    const originalText = element.dataset.originalText || "";
+                    const mask = element.dataset.mask || "****";
+                    element.textContent = hidden ? mask : originalText;
+                });
 
-            if (openIcon && closedIcon) {
-                openIcon.classList.toggle("hidden", hidden);
-                closedIcon.classList.toggle("hidden", !hidden);
-            }
-        };
+                toggleButton.setAttribute("aria-pressed", hidden ? "true" : "false");
+                toggleButton.setAttribute("aria-label", hidden ? "Mostrar valores" : "Ocultar valores");
 
-        let hidden = localStorage.getItem(STORAGE_KEY) === "1";
-        applyState(hidden);
+                if (openIcon && closedIcon) {
+                    openIcon.classList.toggle("hidden", hidden);
+                    closedIcon.classList.toggle("hidden", !hidden);
+                }
+            };
 
-        toggleButton.addEventListener("click", function () {
-            hidden = !hidden;
-            localStorage.setItem(STORAGE_KEY, hidden ? "1" : "0");
+            let hidden = localStorage.getItem(STORAGE_KEY) === "1";
             applyState(hidden);
-        });
-    })();
-</script>
-<script>
-    (function () {
-        const userMenu = document.getElementById("dash-user-menu");
-        const userMenuToggle = document.getElementById("dash-user-menu-toggle");
-        const userMenuPanel = document.getElementById("dash-user-menu-panel");
 
-        if (!userMenu || !userMenuToggle || !userMenuPanel) {
-            return;
+            toggleButton.addEventListener("click", function () {
+                hidden = !hidden;
+                localStorage.setItem(STORAGE_KEY, hidden ? "1" : "0");
+                applyState(hidden);
+            });
         }
 
-        const closeUserMenu = () => {
-            userMenuPanel.classList.add("hidden");
-            userMenuToggle.setAttribute("aria-expanded", "false");
+        const bindTopMenu = (rootId, toggleId, panelId) => {
+            const root = document.getElementById(rootId);
+            const toggle = document.getElementById(toggleId);
+            const panel = document.getElementById(panelId);
+
+            if (!root || !toggle || !panel) {
+                return;
+            }
+
+            panel.style.display = "none";
+
+            const isOpen = () => panel.style.display !== "none";
+
+            const close = () => {
+                panel.classList.add("hidden");
+                panel.style.display = "none";
+                toggle.setAttribute("aria-expanded", "false");
+            };
+
+            const open = () => {
+                panel.classList.remove("hidden");
+                panel.style.display = "block";
+                toggle.setAttribute("aria-expanded", "true");
+            };
+
+            const toggleMenu = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (isOpen()) {
+                    close();
+                } else {
+                    open();
+                }
+            };
+
+            toggle.addEventListener("click", toggleMenu);
+
+            document.addEventListener("pointerdown", (event) => {
+                if (!root.contains(event.target)) {
+                    close();
+                }
+            });
+
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                    close();
+                }
+            });
         };
 
-        userMenuToggle.addEventListener("click", function (event) {
-            event.stopPropagation();
-            const isOpen = !userMenuPanel.classList.contains("hidden");
-            if (isOpen) {
-                closeUserMenu();
-            } else {
-                userMenuPanel.classList.remove("hidden");
-                userMenuToggle.setAttribute("aria-expanded", "true");
-            }
-        });
-
-        document.addEventListener("click", function (event) {
-            if (!userMenu.contains(event.target)) {
-                closeUserMenu();
-            }
-        });
-
-        document.addEventListener("keydown", function (event) {
-            if (event.key === "Escape") {
-                closeUserMenu();
-            }
-        });
+        bindTopMenu("dash-due-menu", "dash-due-menu-toggle", "dash-due-menu-panel");
+        bindTopMenu("dash-user-menu", "dash-user-menu-toggle", "dash-user-menu-panel");
     })();
 </script>
 {% endblock %}
+
+
 
 
 

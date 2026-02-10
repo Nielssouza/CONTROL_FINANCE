@@ -4,8 +4,42 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
+
+
+class ClosedMonth(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="closed_months",
+    )
+    year = models.PositiveSmallIntegerField(
+        "Ano",
+        validators=[MinValueValidator(2000), MaxValueValidator(9999)],
+    )
+    month = models.PositiveSmallIntegerField(
+        "Mes",
+        validators=[MinValueValidator(1), MaxValueValidator(12)],
+    )
+    is_closed = models.BooleanField("Fechado", default=True)
+    closed_at = models.DateTimeField("Fechado em", auto_now_add=True)
+    updated_at = models.DateTimeField("Atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ("-year", "-month")
+        verbose_name = "Mes fechado"
+        verbose_name_plural = "Meses fechados"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("user", "year", "month"),
+                name="unique_closed_month_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.month:02d}/{self.year} - {self.user}"
 
 
 class Transaction(models.Model):

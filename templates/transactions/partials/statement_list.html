@@ -1,3 +1,4 @@
+{% load formatters %}
 {% if transactions %}
     <div class="space-y-4">
         {% for transaction in transactions %}
@@ -5,7 +6,7 @@
                 <h3 class="txn-day-label">{{ transaction.date|date:"l, j"|title }}</h3>
             {% endifchanged %}
 
-            <article class="txn-item-row">
+            <article class="txn-item-row app-action-card" data-press-actions>
                 <div class="txn-item-icon-wrap">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="txn-item-icon-svg">
                         <rect x="5" y="3" width="14" height="18" rx="2"></rect>
@@ -34,15 +35,15 @@
 
                 <div class="text-right">
                     {% if transaction.transaction_type == "expense" %}
-                        <p class="txn-amount txn-amount-expense">R$ {{ transaction.amount|floatformat:2 }}</p>
+                        <p class="txn-amount txn-amount-expense">{{ transaction.amount|brl }}</p>
                     {% elif transaction.transaction_type == "income" %}
-                        <p class="txn-amount txn-amount-income">R$ {{ transaction.amount|floatformat:2 }}</p>
+                        <p class="txn-amount txn-amount-income">{{ transaction.amount|brl }}</p>
                     {% else %}
-                        <p class="txn-amount txn-amount-transfer">R$ {{ transaction.amount|floatformat:2 }}</p>
+                        <p class="txn-amount txn-amount-transfer">{{ transaction.amount|brl }}</p>
                     {% endif %}
-                    <div class="txn-item-actions">
-                        <a href="{% url 'transactions:update' transaction.pk %}" class="txn-action-link txn-action-info" aria-label="Editar transacao">i</a>
-                        <a href="{% url 'transactions:delete' transaction.pk %}" class="txn-action-link txn-action-pin" aria-label="Excluir transacao">x</a>
+                    <div class="app-inline-actions justify-end mt-1">
+                        <a href="{% url 'transactions:update' transaction.pk %}" class="app-link-edit" aria-label="Editar transacao">Editar</a>
+                        <a href="{% url 'transactions:delete' transaction.pk %}" class="app-link-danger" aria-label="Excluir transacao">Excluir</a>
                     </div>
                 </div>
             </article>
@@ -53,4 +54,6 @@
         Nenhuma transacao encontrada para os filtros selecionados.
     </article>
 {% endif %}
+
+
 

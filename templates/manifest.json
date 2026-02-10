@@ -1,8 +1,8 @@
 {% load static %}
 {
-    "name": "Financas Pessoais",
-    "short_name": "Financas",
-    "description": "Controle pessoal de financas com foco em uso mobile.",
+    "name": "Control",
+    "short_name": "Control",
+    "description": "Controle pessoal de Control com foco em uso mobile.",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#0d1018",
