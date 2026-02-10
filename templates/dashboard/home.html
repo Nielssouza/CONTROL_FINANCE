@@ -229,16 +229,16 @@
     </section>
 
     <section class="dash-section">
-        <h2 class="dash-section-title">Despesas por categoria</h2>
+        <h2 class="dash-section-title">{{ category_title }}</h2>
         <article class="dash-category-card">
             <div class="dash-donut-wrap" aria-hidden="true">
-                <div class="dash-donut" style="background: {{ expense_donut_style }};"></div>
+                <div class="dash-donut" style="background: {{ category_donut_style }};"></div>
                 <div class="dash-donut-hole"></div>
             </div>
 
             <div class="dash-legend">
-                {% if expense_categories %}
-                    {% for item in expense_categories %}
+                {% if category_segments %}
+                    {% for item in category_segments %}
                         <div class="dash-legend-item">
                             <span class="dash-legend-dot" style="background-color: {{ item.color }};"></span>
                             <span class="dash-legend-name">{{ item.name }}</span>
@@ -246,7 +246,7 @@
                         </div>
                     {% endfor %}
                 {% else %}
-                    <p class="dash-empty-text">Sem despesas no mes selecionado.</p>
+                    <p class="dash-empty-text">{{ category_empty }}</p>
                 {% endif %}
             </div>
         </article>

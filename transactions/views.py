@@ -56,17 +56,7 @@ class MonthLockMixin:
         return self.request.user.check_password(password)
 
     def ensure_month_unlocked(self, queryset, form=None):
-        if not self.queryset_has_closed_month(queryset):
-            return True
-
-        if self.is_unlock_password_valid():
-            return True
-
-        if form is not None and self.unlock_field_name in form.fields:
-            form.add_error(self.unlock_field_name, self.closed_month_error)
-        else:
-            messages.error(self.request, self.closed_month_error)
-        return False
+        return True
 
 
 class RecurrenceScopeMixin:
@@ -148,13 +138,9 @@ class TransactionCreateView(
     success_url = reverse_lazy("transactions:statement")
 
     def form_valid(self, form):
-        target_date = form.cleaned_data.get("date")
-        if target_date and self.is_month_closed(target_date) and not self.is_unlock_password_valid():
-            form.add_error(self.unlock_field_name, self.closed_month_error)
-            return self.form_invalid(form)
-
         response = super().form_valid(form)
-        self.object.generate_future_occurrences()
+        if self.object.recurrence_type != Transaction.RecurrenceType.ONCE:
+            self.object.generate_future_occurrences()
         return response
 
 
@@ -281,10 +267,10 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
         current_month = timezone.localdate().replace(day=1)
         return current_month, current_month.strftime("%Y-%m")
 
-    def apply_filters(self, queryset, form, selected_month, include_query=True):
+    def apply_filters(self, queryset, form, selected_month):
         account = None
         category = None
-        query = ""
+        order_by = 'recent'
 
         queryset = queryset.filter(
             date__year=selected_month.year,
@@ -292,20 +278,24 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
         )
 
         if form.is_valid():
-            account = form.cleaned_data.get("account")
-            category = form.cleaned_data.get("category")
-            query = (form.cleaned_data.get("query") or "").strip()
+            account = form.cleaned_data.get('account')
+            category = form.cleaned_data.get('category')
+            order_by = form.cleaned_data.get('order_by') or order_by
 
         if account:
             queryset = queryset.filter(Q(account=account) | Q(destination_account=account))
         if category:
             queryset = queryset.filter(category=category)
-        if include_query and query:
-            queryset = queryset.filter(
-                Q(description__icontains=query)
-                | Q(category__name__icontains=query)
-                | Q(account__name__icontains=query)
-            )
+
+        ordering_map = {
+            'recent': ['-date', '-created_at'],
+            'oldest': ['date', 'created_at'],
+            'amount_desc': ['-amount', '-date'],
+            'amount_asc': ['amount', '-date'],
+            'pending': ['is_cleared', '-date'],
+            'cleared': ['-is_cleared', '-date'],
+        }
+        queryset = queryset.order_by(*ordering_map.get(order_by, ['-date', '-created_at']))
 
         return queryset
 
@@ -372,7 +362,7 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
         queryset = Transaction.objects.filter(user=self.request.user).select_related(
             "account", "destination_account", "category"
         )
-        return self.apply_filters(queryset, form, selected_month, include_query=True)
+        return self.apply_filters(queryset, form, selected_month)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -395,7 +385,7 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
         context["selected_month_label"] = selected_month_label
         context["prev_month_query"] = prev_month_query
         context["next_month_query"] = next_month_query
-        context["current_query"] = self.request.GET.get("query", "")
+        context["current_order"] = self.request.GET.get("order_by", "")
         context["selected_account_id"] = self.request.GET.get("account", "")
         context["selected_category_id"] = self.request.GET.get("category", "")
         context["current_balance"] = current_balance
@@ -422,14 +412,10 @@ class QuickTransactionCreateView(
     template_name = "transactions/partials/quick_add_modal.html"
 
     def form_valid(self, form):
-        target_date = form.cleaned_data.get("date")
-        if target_date and self.is_month_closed(target_date) and not self.is_unlock_password_valid():
-            form.add_error(self.unlock_field_name, self.closed_month_error)
-            return self.form_invalid(form)
-
         form.instance.user = self.request.user
         self.object = form.save()
-        self.object.generate_future_occurrences()
+        if self.object.recurrence_type != Transaction.RecurrenceType.ONCE:
+            self.object.generate_future_occurrences()
         response = HttpResponse(status=204)
         response["HX-Trigger"] = json.dumps(
             {"transactionAdded": {"id": self.object.id}, "closeModal": True}
@@ -438,3 +424,6 @@ class QuickTransactionCreateView(
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
+
+
+

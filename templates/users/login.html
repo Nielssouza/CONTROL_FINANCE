@@ -16,9 +16,11 @@
         </button>
     </form>
 
+    {% if app_public_signup_enabled %}
     <p class="text-center app-muted-text">
         Ainda nao possui conta?
         <a href="{% url 'users:register' %}" class="app-link-inline">Cadastrar</a>
     </p>
+    {% endif %}
 </section>
 {% endblock %}

@@ -23,20 +23,9 @@ class TransactionForm(forms.ModelForm):
     )
     date = forms.DateField(
         label="Data",
-        widget=forms.DateInput(attrs={"type": "date"}),
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
     )
 
-    unlock_password = forms.CharField(
-        label="Senha para mes fechado",
-        required=False,
-        widget=forms.PasswordInput(
-            attrs={
-                "autocomplete": "current-password",
-                "placeholder": "Preencha apenas para alterar mes fechado",
-            }
-        ),
-        help_text="Obrigatoria somente quando o mes estiver fechado.",
-    )
     class Meta:
         model = Transaction
         fields = (
@@ -62,7 +51,7 @@ class TransactionForm(forms.ModelForm):
             "description": "Descricao",
             "recurrence_type": "Recorrencia",
             "installment_count": "Quantidade de parcelas",
-            "recurrence_interval": "Intervalo",
+            "recurrence_interval": "Intervalo (dias)",
         }
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
@@ -75,23 +64,29 @@ class TransactionForm(forms.ModelForm):
         self.instance.user = user
 
         if "recurrence_type" in self.fields:
-            self.fields["recurrence_type"].choices = [(Transaction.RecurrenceType.FIXED, "Fixa"), (Transaction.RecurrenceType.INSTALLMENT, "Parcelado")]
+            self.fields["recurrence_type"].choices = [
+                (Transaction.RecurrenceType.ONCE, "Unica"),
+                (Transaction.RecurrenceType.FIXED, "Fixa"),
+                (Transaction.RecurrenceType.INSTALLMENT, "Parcelado"),
+            ]
+            if not self.instance.pk and not self.is_bound:
+                self.fields["recurrence_type"].initial = Transaction.RecurrenceType.ONCE
 
         if self.instance and self.instance.pk and "amount" in self.fields:
             self.initial["amount"] = f"{self.instance.amount:.2f}"
+
+        if self.instance and self.instance.pk and self.instance.date and "date" in self.fields:
+            self.initial["date"] = self.instance.date.isoformat()
 
         if "is_cleared" in self.fields:
             self.fields["is_cleared"].required = False
             self.fields["is_cleared"].help_text = "Desmarcada = pendente."
 
-        self.fields["account"].queryset = Account.objects.filter(
-            user=user, is_active=True
-        ).order_by("name")
+        account_qs = Account.objects.filter(user=user, is_active=True).order_by("name")
+        self.fields["account"].queryset = account_qs
 
         if "destination_account" in self.fields:
-            self.fields["destination_account"].queryset = Account.objects.filter(
-                user=user, is_active=True
-            ).order_by("name")
+            self.fields["destination_account"].queryset = account_qs
             self.fields["destination_account"].required = False
 
         if "category" in self.fields:
@@ -104,6 +99,12 @@ class TransactionForm(forms.ModelForm):
             self.fields["installment_count"].required = False
             self.fields["installment_count"].widget.attrs.update(
                 {"min": "2", "step": "1", "placeholder": "Ex.: 12"}
+            )
+
+        if "recurrence_interval" in self.fields:
+            self.fields["recurrence_interval"].help_text = "Informe em dias (ex.: 30)."
+            self.fields["recurrence_interval"].widget.attrs.update(
+                {"min": "1", "step": "1", "placeholder": "Ex.: 30"}
             )
 
         style_form_fields(self)
@@ -135,7 +136,11 @@ class TransactionForm(forms.ModelForm):
         transaction_type = cleaned_data.get("transaction_type")
         recurrence_type = cleaned_data.get("recurrence_type")
 
-        if recurrence_type not in {Transaction.RecurrenceType.FIXED, Transaction.RecurrenceType.INSTALLMENT}:
+        if recurrence_type not in {
+            Transaction.RecurrenceType.ONCE,
+            Transaction.RecurrenceType.FIXED,
+            Transaction.RecurrenceType.INSTALLMENT,
+        }:
             self.add_error("recurrence_type", "Recorrencia invalida.")
 
         if transaction_type == Transaction.TransactionType.TRANSFER:
@@ -157,6 +162,7 @@ class QuickTransactionForm(TransactionForm):
             "date",
             "is_cleared",
             "account",
+            "destination_account",
             "category",
             "recurrence_type",
             "installment_count",
@@ -172,12 +178,16 @@ class QuickTransactionForm(TransactionForm):
             in {
                 Transaction.TransactionType.INCOME,
                 Transaction.TransactionType.EXPENSE,
+                Transaction.TransactionType.TRANSFER,
             }
         ]
         self.fields["recurrence_type"].choices = [
+            (Transaction.RecurrenceType.ONCE, "Unica"),
             (Transaction.RecurrenceType.FIXED, "Fixa"),
             (Transaction.RecurrenceType.INSTALLMENT, "Parcelado"),
         ]
+        if not self.instance.pk and not self.is_bound:
+            self.fields["recurrence_type"].initial = Transaction.RecurrenceType.ONCE
 
     def clean(self):
         cleaned_data = super().clean()
@@ -196,6 +206,15 @@ class QuickTransactionForm(TransactionForm):
 
 
 class StatementFilterForm(forms.Form):
+    ORDER_CHOICES = [
+        ("recent", "Mais recentes"),
+        ("oldest", "Mais antigas"),
+        ("amount_desc", "Maior valor"),
+        ("amount_asc", "Menor valor"),
+        ("pending", "Pendentes primeiro"),
+        ("cleared", "Baixadas primeiro"),
+    ]
+
     month = forms.CharField(
         label="Mes",
         required=False,
@@ -212,9 +231,10 @@ class StatementFilterForm(forms.Form):
         queryset=Category.objects.none(),
         empty_label="Todas",
     )
-    query = forms.CharField(
-        label="Buscar",
+    order_by = forms.ChoiceField(
+        label="Classificacao",
         required=False,
+        choices=ORDER_CHOICES,
     )
 
     def __init__(self, *args, **kwargs):
@@ -227,8 +247,7 @@ class StatementFilterForm(forms.Form):
         self.fields["category"].queryset = Category.objects.filter(user=user).order_by(
             "category_type", "name"
         )
-        self.fields["query"].widget.attrs["placeholder"] = "Buscar"
-        self.fields["query"].widget.attrs["autocomplete"] = "off"
+        self.fields["order_by"].initial = self.ORDER_CHOICES[0][0]
         style_form_fields(self)
 
     def clean_month(self):

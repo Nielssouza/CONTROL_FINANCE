@@ -44,27 +44,56 @@
         const recurrenceField = form.querySelector('[name="recurrence_type"]');
         const installmentField = form.querySelector('[name="installment_count"]');
         const intervalField = form.querySelector('[name="recurrence_interval"]');
+        const txTypeField = form.querySelector('[name="transaction_type"]');
+        const destField = form.querySelector('[name="destination_account"]');
 
         if (!recurrenceField) return;
 
         const installmentWrapper = installmentField ? installmentField.closest("div.space-y-1") : null;
         const intervalWrapper = intervalField ? intervalField.closest("div.space-y-1") : null;
+        const destWrapper = destField ? destField.closest("div.space-y-1") : null;
 
         const toggleFieldsMain = () => {
             const isInstallment = recurrenceField.value === "installment";
-            const showInterval = recurrenceField.value !== "fixed";
+            const showInterval = !(recurrenceField.value === "fixed" || recurrenceField.value === "once");
 
             if (installmentWrapper) {
                 installmentWrapper.classList.toggle("hidden", !isInstallment);
-                if (!isInstallment && installmentField) installmentField.value = "";
-            }
+                            }
             if (intervalWrapper) {
                 intervalWrapper.classList.toggle("hidden", !showInterval);
             }
         };
 
+        const syncDestinationOptions = () => {
+            if (!txTypeField || !destField) return;
+            const sourceValue = txTypeField.form.querySelector('[name="account"]')?.value || "";
+            Array.from(destField.options).forEach((opt) => {
+                if (!opt.value) return;
+                opt.disabled = !!(sourceValue && opt.value === sourceValue && opt.value !== destField.value);
+            });
+                    };
+
+        const toggleTransfer = () => {
+            if (!destWrapper) return;
+            const isTransfer = txTypeField && txTypeField.value === "transfer";
+            destWrapper.classList.toggle("hidden", !isTransfer);
+            if (destField) {
+                destField.required = isTransfer;
+                            }
+            syncDestinationOptions();
+        };
+
+        const accountField = form.querySelector('[name="account"]');
         recurrenceField.addEventListener('change', toggleFieldsMain);
+        if (txTypeField) {
+            txTypeField.addEventListener('change', toggleTransfer);
+        }
+        if (accountField) {
+            accountField.addEventListener('change', syncDestinationOptions);
+        }
         toggleFieldsMain();
+        toggleTransfer();
     })();
 </script>
 {% endblock %}

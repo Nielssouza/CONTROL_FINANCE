@@ -29,7 +29,7 @@ MONTH_NAMES_PT = {
 
 
 class DashboardContextMixin(LoginRequiredMixin):
-    expense_palette = ["#0b0b0f", "#7abf00", "#d1d5db", "#9ca3af", "#fb7185"]
+    category_palette = ["#0b0b0f", "#7abf00", "#d1d5db", "#9ca3af", "#fb7185"]
 
     def _shift_month(self, base_month: date, offset: int) -> date:
         serial = base_month.year * 12 + (base_month.month - 1) + offset
@@ -66,22 +66,19 @@ class DashboardContextMixin(LoginRequiredMixin):
         selected_label = f"{MONTH_NAMES_PT.get(selected_month.month, '')} {selected_month.year}"
         return selected_label, prev_params.urlencode(), next_params.urlencode()
 
-    def _build_expense_chart(self, current_month_transactions, monthly_expense):
-        expense_rows = list(
-            current_month_transactions.filter(
-                transaction_type=Transaction.TransactionType.EXPENSE
-            )
-            .values("category__name")
+    def _build_category_chart(self, base_queryset, total_amount):
+        rows = list(
+            base_queryset.values("category__name")
             .annotate(total=Coalesce(Sum("amount"), Decimal("0.00")))
             .order_by("-total")
         )
 
-        if monthly_expense <= 0:
+        if total_amount <= 0:
             return [], "conic-gradient(#2b2f3a 0 100%)"
 
         segments = []
         running_total = Decimal("0.00")
-        top_rows = expense_rows[:4]
+        top_rows = rows[:4]
 
         for idx, row in enumerate(top_rows):
             amount = row["total"] or Decimal("0.00")
@@ -92,21 +89,21 @@ class DashboardContextMixin(LoginRequiredMixin):
                 {
                     "name": row["category__name"] or "Sem categoria",
                     "total": amount,
-                    "color": self.expense_palette[idx % len(self.expense_palette)],
+                    "color": self.category_palette[idx % len(self.category_palette)],
                 }
             )
 
-        remainder = monthly_expense - running_total
+        remainder = total_amount - running_total
         if remainder > 0:
             segments.append(
                 {
                     "name": "Outros",
                     "total": remainder,
-                    "color": self.expense_palette[len(segments) % len(self.expense_palette)],
+                    "color": self.category_palette[len(segments) % len(self.category_palette)],
                 }
             )
 
-        total_float = float(monthly_expense)
+        total_float = float(total_amount)
         cursor = 0.0
         stops = []
         for segment in segments:
@@ -189,9 +186,16 @@ class DashboardContextMixin(LoginRequiredMixin):
         )["total"]
         pending_expense_count = pending_expenses.count()
 
-        expense_categories, expense_donut_style = self._build_expense_chart(
-            current_month_transactions,
-            monthly_expense,
+        category_source = current_month_transactions.filter(
+            transaction_type=Transaction.TransactionType.EXPENSE
+        )
+        category_total = monthly_expense
+        category_title = "Despesas por categoria"
+        category_empty = "Sem despesas no mes selecionado."
+
+        category_segments, category_donut_style = self._build_category_chart(
+            category_source,
+            category_total,
         )
 
         active_goal = (
@@ -219,6 +223,8 @@ class DashboardContextMixin(LoginRequiredMixin):
             "total_balance": initial_total + total_income - total_expense,
             "monthly_income": monthly_income,
             "monthly_expense": monthly_expense,
+            "category_title": category_title,
+            "category_empty": category_empty,
             "latest_transactions": latest_transactions,
             "selected_month_label": selected_month_label,
             "prev_month_query": prev_month_query,
@@ -229,8 +235,8 @@ class DashboardContextMixin(LoginRequiredMixin):
             "due_notifications": due_notifications,
             "due_notifications_count": due_notifications_count,
             "due_overdue_count": due_overdue_count,
-            "expense_categories": expense_categories,
-            "expense_donut_style": expense_donut_style,
+            "category_segments": category_segments,
+            "category_donut_style": category_donut_style,
             "active_goal": active_goal,
             "goal_saved": goal_saved,
             "goal_target": goal_target,

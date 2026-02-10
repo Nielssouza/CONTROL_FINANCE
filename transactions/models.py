@@ -1,4 +1,4 @@
-from calendar import monthrange
+﻿from calendar import monthrange
 from datetime import date as date_cls
 from decimal import Decimal
 
@@ -49,6 +49,7 @@ class Transaction(models.Model):
         TRANSFER = "transfer", "Transferencia"
 
     class RecurrenceType(models.TextChoices):
+        ONCE = "once", "Unica"
         FIXED = "fixed", "Fixa"
         MONTHLY = "monthly", "Mensal"
         QUARTERLY = "quarterly", "Trimestral"
@@ -102,7 +103,7 @@ class Transaction(models.Model):
         "Recorrencia",
         max_length=20,
         choices=RecurrenceType.choices,
-        default=RecurrenceType.FIXED,
+        default=RecurrenceType.ONCE,
     )
     recurrence_interval = models.PositiveSmallIntegerField(
         "Intervalo de recorrencia",
@@ -172,6 +173,9 @@ class Transaction(models.Model):
             total_installments = max(1, self.installment_count or 1)
             count = max(0, total_installments - 1)
             return step_months, count
+
+        if self.recurrence_type == self.RecurrenceType.ONCE:
+            return 0, 0
 
         return 0, 0
 
@@ -284,3 +288,6 @@ class Transaction(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+
