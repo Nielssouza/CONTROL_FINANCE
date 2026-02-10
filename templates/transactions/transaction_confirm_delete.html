@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Excluir Transacao | Financas{% endblock %}
+
+{% block content %}
+<section class="app-page space-y-4">
+    <h1 class="app-title">Excluir transacao</h1>
+    <article class="card space-y-4">
+        <p class="app-muted-text">
+            Tem certeza que deseja excluir esta transacao de <strong>R$ {{ object.amount|floatformat:2 }}</strong>?
+        </p>
+        <form method="post" class="grid grid-cols-2 gap-2">
+            {% csrf_token %}
+            <a href="{% url 'transactions:statement' %}" class="app-btn-secondary text-center">Cancelar</a>
+            <button type="submit" class="app-btn-danger">Excluir</button>
+        </form>
+    </article>
+</section>
+{% endblock %}

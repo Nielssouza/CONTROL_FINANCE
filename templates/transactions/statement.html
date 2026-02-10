@@ -1,0 +1,109 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Transacoes | Financas{% endblock %}
+{% block body_class %}transactions-body{% endblock %}
+{% block shell_class %}transactions-shell{% endblock %}
+{% block page_header %}{% endblock %}
+{% block main_class %}px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-36{% endblock %}
+{% block floating_action %}{% endblock %}
+
+{% block bottom_navigation %}
+{% if user.is_authenticated %}
+<nav class="txn-bottom-nav">
+    <a href="{% url 'dashboard:home' %}" class="txn-tab-link">
+        <span class="txn-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        </span>
+        <span>Principal</span>
+    </a>
+
+    <a href="{% url 'transactions:statement' %}" class="txn-tab-link txn-tab-active">
+        <span class="txn-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14"/><path d="M5 12h14"/><path d="M5 17h14"/></svg>
+        </span>
+        <span>Transacoes</span>
+    </a>
+
+    <button
+        hx-get="{% url 'transactions:quick-add' %}"
+        hx-target="#modal-content"
+        hx-swap="innerHTML"
+        class="txn-center-fab"
+        aria-label="Adicionar transacao"
+    >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="txn-center-fab-icon" aria-hidden="true">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+        </svg>
+    </button>
+
+    <a href="{% url 'accounts:list' %}" class="txn-tab-link">
+        <span class="txn-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg>
+        </span>
+        <span>Contas</span>
+    </a>
+
+    <a href="{% url 'categories:list' %}" class="txn-tab-link">
+        <span class="txn-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+        </span>
+        <span>Categorias</span>
+    </a>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="transactions-screen space-y-5">
+    <div class="txn-month-nav">
+        {% if prev_month_query %}
+            <a href="?{{ prev_month_query }}" class="txn-month-arrow" aria-label="Mes anterior">&lsaquo;</a>
+        {% else %}
+            <span class="txn-month-arrow txn-month-arrow-disabled">&lsaquo;</span>
+        {% endif %}
+
+        <h1 class="txn-month-title">{{ selected_month_label|title }}</h1>
+
+        {% if next_month_query %}
+            <a href="?{{ next_month_query }}" class="txn-month-arrow" aria-label="Mes seguinte">&rsaquo;</a>
+        {% else %}
+            <span class="txn-month-arrow txn-month-arrow-disabled">&rsaquo;</span>
+        {% endif %}
+    </div>
+
+    <article class="txn-balance-card">
+        <div class="txn-balance-grid">
+            <div class="txn-balance-item">
+                <span class="txn-balance-label">Saldo atual</span>
+                <strong class="txn-balance-value">R$ {{ current_balance|floatformat:2 }}</strong>
+            </div>
+            <div class="txn-balance-divider"></div>
+            <div class="txn-balance-item">
+                <span class="txn-balance-label">Balanco mensal</span>
+                <strong class="txn-balance-value">R$ {{ monthly_balance|floatformat:2 }}</strong>
+            </div>
+        </div>
+    </article>
+
+    <form method="get" class="txn-search-form">
+        <input type="hidden" name="month" value="{{ selected_month_value }}">
+        <div class="txn-search-wrap">
+            <span class="txn-search-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            </span>
+            <input type="text" name="query" value="{{ current_query }}" placeholder="Buscar" class="txn-search-input">
+        </div>
+    </form>
+
+    <div
+        id="statement-list"
+        hx-get="{% url 'transactions:statement-partial' %}{% if querystring %}?{{ querystring }}{% endif %}"
+        hx-trigger="transactionAdded from:body"
+        hx-swap="innerHTML"
+    >
+        {% include "transactions/partials/statement_list.html" %}
+    </div>
+</section>
+{% endblock %}
+

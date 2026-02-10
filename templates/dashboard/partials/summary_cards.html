@@ -1,0 +1,17 @@
+<div class="grid grid-cols-1 gap-3">
+    <article class="card">
+        <p class="app-muted-text">Saldo total</p>
+        <p class="mt-1 text-2xl font-bold text-slate-100">R$ {{ total_balance|floatformat:2 }}</p>
+    </article>
+
+    <div class="grid grid-cols-2 gap-3">
+        <article class="card">
+            <p class="app-muted-text">Receitas mes</p>
+            <p class="mt-2 text-lg font-semibold text-emerald-400">R$ {{ monthly_income|floatformat:2 }}</p>
+        </article>
+        <article class="card">
+            <p class="app-muted-text">Despesas mes</p>
+            <p class="mt-2 text-lg font-semibold text-rose-400">R$ {{ monthly_expense|floatformat:2 }}</p>
+        </article>
+    </div>
+</div>

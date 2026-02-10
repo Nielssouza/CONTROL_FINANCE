@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Transacao | Financas{% endblock %}
+
+{% block content %}
+<section class="app-page space-y-4">
+    <div>
+        <h1 class="app-title">{% if object %}Editar transacao{% else %}Nova transacao{% endif %}</h1>
+        <p class="app-subtitle">Registre receita, despesa ou transferencia.</p>
+    </div>
+
+    <form method="post" class="card space-y-4">
+        {% include "partials/form_fields.html" %}
+        <div class="grid grid-cols-2 gap-2">
+            <a href="{% url 'transactions:statement' %}" class="app-btn-secondary text-center">Cancelar</a>
+            <button type="submit" class="app-btn-primary">Salvar</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

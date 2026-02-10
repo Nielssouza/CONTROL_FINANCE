@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+
+{% block title %}Principal | Financas{% endblock %}
+{% block body_class %}dash-body{% endblock %}
+{% block shell_class %}dash-shell{% endblock %}
+{% block page_header %}{% endblock %}
+{% block main_class %}dash-main{% endblock %}
+{% block floating_action %}{% endblock %}
+
+{% block bottom_navigation %}
+{% if user.is_authenticated %}
+<nav class="dash-bottom-nav">
+    <a href="{% url 'dashboard:home' %}" class="dash-tab-link dash-tab-active" aria-current="page">
+        <span class="dash-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M3 10.5L12 3l9 7.5"></path>
+                <path d="M5 9.5V21h14V9.5"></path>
+            </svg>
+        </span>
+        <span>Principal</span>
+    </a>
+
+    <a href="{% url 'transactions:statement' %}" class="dash-tab-link">
+        <span class="dash-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M5 7h14"></path>
+                <path d="M5 12h14"></path>
+                <path d="M5 17h14"></path>
+            </svg>
+        </span>
+        <span>Transacoes</span>
+    </a>
+
+    <button
+        hx-get="{% url 'transactions:quick-add' %}"
+        hx-target="#modal-content"
+        hx-swap="innerHTML"
+        class="dash-center-fab"
+        aria-label="Adicionar transacao"
+    >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="dash-center-fab-icon" aria-hidden="true">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+        </svg>
+    </button>
+
+    <a href="{% url 'accounts:list' %}" class="dash-tab-link">
+        <span class="dash-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                <path d="M3 9h18"></path>
+            </svg>
+        </span>
+        <span>Contas</span>
+    </a>
+
+    <a href="{% url 'categories:list' %}" class="dash-tab-link">
+        <span class="dash-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="5" cy="12" r="1.7"></circle>
+                <circle cx="12" cy="12" r="1.7"></circle>
+                <circle cx="19" cy="12" r="1.7"></circle>
+            </svg>
+        </span>
+        <span>Categorias</span>
+    </a>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="dash-screen">
+    <article class="dash-hero-card">
+        <div class="dash-hero-top">
+            <div class="dash-due-menu" id="dash-due-menu">
+                <button
+                    type="button"
+                    class="dash-icon-btn dash-icon-btn-notify"
+                    id="dash-due-menu-toggle"
+                    aria-expanded="false"
+                    aria-controls="dash-due-menu-panel"
+                    aria-label="Notificacoes de vencimentos"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M12 4a4 4 0 0 0-4 4v2.5c0 .9-.3 1.8-.9 2.5L5.5 15h13l-1.6-2c-.6-.7-.9-1.6-.9-2.5V8a4 4 0 0 0-4-4z"></path>
+                        <path d="M9.7 18a2.3 2.3 0 0 0 4.6 0"></path>
+                    </svg>
+                    {% if due_notifications_count %}
+                        <span class="dash-notify-dot">{{ due_notifications_count }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="dash-due-panel hidden" id="dash-due-menu-panel" role="menu">
+                    <p class="dash-due-title">Vencimentos</p>
+                    <p class="dash-due-meta">
+                        {{ due_notifications_count }} para os proximos 30 dias
+                        {% if due_overdue_count %}
+                            | {{ due_overdue_count }} atrasada(s)
+                        {% endif %}
+                    </p>
+
+                    {% if due_notifications %}
+                        <div class="dash-due-list">
+                            {% for item in due_notifications %}
+                                <div class="dash-due-item">
+                                    <span class="dash-due-date">{{ item.date|date:"d/m" }}</span>
+                                    <div class="dash-due-content">
+                                        <p class="dash-due-name">{{ item.description|default:"Despesa sem descricao" }}</p>
+                                        <p class="dash-due-sub">{{ item.account.name }}{% if item.category %} | {{ item.category.name }}{% endif %}</p>
+                                    </div>
+                                    <div class="dash-due-right">
+                                        <span class="dash-due-amount">R$ {{ item.amount|floatformat:2 }}</span>
+                                        {% if item.date < today %}
+                                            <span class="dash-due-status dash-due-status-overdue">Atrasada</span>
+                                        {% elif item.date == today %}
+                                            <span class="dash-due-status dash-due-status-today">Vence hoje</span>
+                                        {% else %}
+                                            <span class="dash-due-status dash-due-status-open">A vencer</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="dash-due-empty">Sem vencimentos proximos.</p>
+                    {% endif %}
+
+                    <a href="{% url 'transactions:statement' %}" class="dash-due-link">Abrir transacoes</a>
+                </div>
+            </div>
+<form method="get" class="dash-month-form" aria-label="Selecionar mes">
+                <div class="dash-month-pill">
+                    <select name="month" class="dash-month-select" onchange="this.form.submit()" aria-label="Mes">
+                        {% for option in month_options %}
+                            <option value="{{ option.value }}" {% if option.value == selected_month_value %}selected{% endif %}>{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="dash-month-chevron" aria-hidden="true">
+                        <path d="M6 9l6 6 6-6"></path>
+                    </svg>
+                </div>
+            </form>
+            <div class="dash-user-menu" id="dash-user-menu">
+                <button
+                    type="button"
+                    class="dash-gift-btn"
+                    id="dash-user-menu-toggle"
+                    aria-expanded="false"
+                    aria-controls="dash-user-menu-panel"
+                    aria-label="Sessao do usuario"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+                        <circle cx="12" cy="8" r="3.4"></circle>
+                        <path d="M5 19c1.3-3 4.1-4.5 7-4.5s5.7 1.5 7 4.5"></path>
+                    </svg>
+                    <span class="dash-gift-dot"></span>
+                </button>
+
+                <div class="dash-user-menu-panel hidden" id="dash-user-menu-panel" role="menu">
+                    <p class="dash-user-menu-name">{{ user.get_full_name|default:user.username }}</p>
+                    <p class="dash-user-menu-meta">Sessao ativa</p>
+                    {% if user.is_staff %}
+                        <a href="{% url 'admin:index' %}" class="dash-user-menu-link">Admin</a>
+                    {% endif %}
+                    <form method="post" action="{% url 'users:logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="dash-user-menu-logout">Sair</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <p class="dash-balance-label">Saldo atual em contas</p>
+        <h1 class="dash-balance-value" data-sensitive-value data-mask="R$ ****">R$ {{ total_balance|floatformat:2 }}</h1>
+
+        <button
+            type="button"
+            id="dash-visibility-toggle"
+            class="dash-eye-icon"
+            aria-label="Ocultar valores"
+            aria-pressed="false"
+        >
+            <svg class="dash-eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="2.8"></circle>
+            </svg>
+            <svg class="dash-eye-closed hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <path d="M4 4l16 16"></path>
+            </svg>
+        </button>
+
+        <div class="dash-income-expense-row">
+            <div class="dash-flow-item">
+                <span class="dash-flow-icon dash-flow-icon-income" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <path d="M12 18V6"></path>
+                        <path d="M7 11l5-5 5 5"></path>
+                    </svg>
+                </span>
+                <div>
+                    <p class="dash-flow-label">Receitas</p>
+                    <p class="dash-flow-value dash-flow-value-income" data-sensitive-value data-mask="R$ ****">R$ {{ monthly_income|floatformat:2 }}</p>
+                </div>
+            </div>
+
+            <div class="dash-flow-item dash-flow-item-right">
+                <span class="dash-flow-icon dash-flow-icon-expense" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <path d="M12 6v12"></path>
+                        <path d="M7 13l5 5 5-5"></path>
+                    </svg>
+                </span>
+                <div>
+                    <p class="dash-flow-label">Despesas</p>
+                    <p class="dash-flow-value dash-flow-value-expense" data-sensitive-value data-mask="R$ ****">R$ {{ monthly_expense|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <section class="dash-section">
+        <h2 class="dash-section-title">Pendencias e alertas</h2>
+        <article class="dash-alert-card">
+            <div class="dash-alert-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 4v13"></path>
+                    <path d="M6.5 12.5L12 18l5.5-5.5"></path>
+                </svg>
+            </div>
+            <span class="dash-alert-badge">{{ pending_expense_count }}</span>
+            <p class="dash-alert-title">Despesas pendentes</p>
+            <p class="dash-alert-amount" data-sensitive-value data-mask="R$ ****">R$ {{ pending_expense_total|floatformat:2 }}</p>
+        </article>
+    </section>
+
+    <section class="dash-section">
+        <h2 class="dash-section-title">Despesas por categoria</h2>
+        <article class="dash-category-card">
+            <div class="dash-donut-wrap" aria-hidden="true">
+                <div class="dash-donut" style="background: {{ expense_donut_style }};"></div>
+                <div class="dash-donut-hole"></div>
+            </div>
+
+            <div class="dash-legend">
+                {% if expense_categories %}
+                    {% for item in expense_categories %}
+                        <div class="dash-legend-item">
+                            <span class="dash-legend-dot" style="background-color: {{ item.color }};"></span>
+                            <span class="dash-legend-name">{{ item.name }}</span>
+                            <span class="dash-legend-amount" data-sensitive-value data-mask="R$ ****">R$ {{ item.total|floatformat:2 }}</span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="dash-empty-text">Sem despesas no mes selecionado.</p>
+                {% endif %}
+            </div>
+        </article>
+    </section>
+
+    <section class="dash-section">
+        <div class="dash-goals-header">
+            <h2 class="dash-section-title mb-0">Objetivos</h2>
+            <span class="dash-goals-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <rect x="4" y="4" width="6" height="16" rx="2"></rect>
+                    <rect x="14" y="4" width="6" height="16" rx="2"></rect>
+                </svg>
+            </span>
+        </div>
+
+        <article class="dash-goal-card">
+            <span class="dash-goal-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M4 4l7 7"></path>
+                    <path d="M13 13l7 7"></path>
+                    <path d="M3 11l8-8"></path>
+                    <path d="M13 21l8-8"></path>
+                    <circle cx="8.5" cy="8.5" r="1"></circle>
+                    <circle cx="15.5" cy="15.5" r="1"></circle>
+                </svg>
+            </span>
+
+            {% if active_goal %}
+                <p class="dash-goal-title">{{ active_goal.name }}</p>
+                <div class="dash-goal-progress-wrap">
+                    <div class="dash-goal-progress-track">
+                        <div class="dash-goal-progress-fill" style="width: {{ goal_progress|floatformat:2 }}%;"></div>
+                        <span class="dash-goal-percent" data-sensitive-value data-mask="**,**%">{{ goal_progress|floatformat:2 }}%</span>
+                    </div>
+                </div>
+
+                <p class="dash-goal-values" data-sensitive-value data-mask="R$ ****/R$ ****">R$ {{ goal_saved|floatformat:"2g" }}/R$ {{ goal_target|floatformat:"2g" }}</p>
+                <p class="dash-goal-remaining" data-sensitive-value data-mask="Faltam R$ ****">Faltam R$ {{ goal_remaining|floatformat:"2g" }}</p>
+                <a href="{% url 'goals:detail' active_goal.pk %}" class="dash-goal-more">Ver mais</a>
+            {% else %}
+                <p class="dash-goal-title">Nenhum objetivo ativo</p>
+                <div class="dash-goal-progress-wrap">
+                    <div class="dash-goal-progress-track">
+                        <div class="dash-goal-progress-fill" style="width: 0%;"></div>
+                        <span class="dash-goal-percent" data-sensitive-value data-mask="**,**%">0,00%</span>
+                    </div>
+                </div>
+                <p class="dash-goal-values" data-sensitive-value data-mask="R$ ****/R$ ****">R$ 0,00/R$ 0,00</p>
+                <p class="dash-goal-remaining">Crie um objetivo para acompanhar sua reserva.</p>
+                <a href="{% url 'goals:create' %}" class="dash-goal-more">Criar</a>
+            {% endif %}
+        </article>
+
+    </section>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+    (function () {
+        const dueMenu = document.getElementById("dash-due-menu");
+        const dueMenuToggle = document.getElementById("dash-due-menu-toggle");
+        const dueMenuPanel = document.getElementById("dash-due-menu-panel");
+
+        if (!dueMenu || !dueMenuToggle || !dueMenuPanel) {
+            return;
+        }
+
+        const closeDueMenu = () => {
+            dueMenuPanel.classList.add("hidden");
+            dueMenuToggle.setAttribute("aria-expanded", "false");
+        };
+
+        dueMenuToggle.addEventListener("click", function (event) {
+            event.stopPropagation();
+            const isOpen = !dueMenuPanel.classList.contains("hidden");
+            if (isOpen) {
+                closeDueMenu();
+            } else {
+                dueMenuPanel.classList.remove("hidden");
+                dueMenuToggle.setAttribute("aria-expanded", "true");
+            }
+        });
+
+        document.addEventListener("click", function (event) {
+            if (!dueMenu.contains(event.target)) {
+                closeDueMenu();
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                closeDueMenu();
+            }
+        });
+    })();
+</script>
+<script>
+    (function () {
+        const toggleButton = document.getElementById("dash-visibility-toggle");
+        if (!toggleButton) {
+            return;
+        }
+
+        const STORAGE_KEY = "finance_values_hidden";
+        const targets = Array.from(document.querySelectorAll("[data-sensitive-value]"));
+        const openIcon = toggleButton.querySelector(".dash-eye-open");
+        const closedIcon = toggleButton.querySelector(".dash-eye-closed");
+
+        if (!targets.length) {
+            return;
+        }
+
+        targets.forEach((element) => {
+            if (!element.dataset.originalText) {
+                element.dataset.originalText = element.textContent.trim();
+            }
+        });
+
+        const applyState = (hidden) => {
+            targets.forEach((element) => {
+                const originalText = element.dataset.originalText || "";
+                const mask = element.dataset.mask || "****";
+                element.textContent = hidden ? mask : originalText;
+            });
+
+            toggleButton.setAttribute("aria-pressed", hidden ? "true" : "false");
+            toggleButton.setAttribute("aria-label", hidden ? "Mostrar valores" : "Ocultar valores");
+
+            if (openIcon && closedIcon) {
+                openIcon.classList.toggle("hidden", hidden);
+                closedIcon.classList.toggle("hidden", !hidden);
+            }
+        };
+
+        let hidden = localStorage.getItem(STORAGE_KEY) === "1";
+        applyState(hidden);
+
+        toggleButton.addEventListener("click", function () {
+            hidden = !hidden;
+            localStorage.setItem(STORAGE_KEY, hidden ? "1" : "0");
+            applyState(hidden);
+        });
+    })();
+</script>
+<script>
+    (function () {
+        const userMenu = document.getElementById("dash-user-menu");
+        const userMenuToggle = document.getElementById("dash-user-menu-toggle");
+        const userMenuPanel = document.getElementById("dash-user-menu-panel");
+
+        if (!userMenu || !userMenuToggle || !userMenuPanel) {
+            return;
+        }
+
+        const closeUserMenu = () => {
+            userMenuPanel.classList.add("hidden");
+            userMenuToggle.setAttribute("aria-expanded", "false");
+        };
+
+        userMenuToggle.addEventListener("click", function (event) {
+            event.stopPropagation();
+            const isOpen = !userMenuPanel.classList.contains("hidden");
+            if (isOpen) {
+                closeUserMenu();
+            } else {
+                userMenuPanel.classList.remove("hidden");
+                userMenuToggle.setAttribute("aria-expanded", "true");
+            }
+        });
+
+        document.addEventListener("click", function (event) {
+            if (!userMenu.contains(event.target)) {
+                closeUserMenu();
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                closeUserMenu();
+            }
+        });
+    })();
+</script>
+{% endblock %}
+
+
+
+
+
+
+

@@ -1,0 +1,24 @@
+{% if latest_transactions %}
+    <div class="space-y-2">
+        {% for transaction in latest_transactions %}
+            <article class="card flex items-center justify-between gap-3 p-3">
+                <div>
+                    <p class="app-item-title">{{ transaction.description|default:"Sem descricao" }}</p>
+                    <p class="app-item-meta">{{ transaction.date|date:"d/m/Y" }} - {{ transaction.account.name }}</p>
+                </div>
+                <div class="text-right">
+                    {% if transaction.transaction_type == "expense" %}
+                        <p class="text-sm font-semibold text-rose-400">- R$ {{ transaction.amount|floatformat:2 }}</p>
+                    {% elif transaction.transaction_type == "income" %}
+                        <p class="text-sm font-semibold text-emerald-400">+ R$ {{ transaction.amount|floatformat:2 }}</p>
+                    {% else %}
+                        <p class="text-sm font-semibold text-sky-400">R$ {{ transaction.amount|floatformat:2 }}</p>
+                    {% endif %}
+                    <span class="badge badge-{{ transaction.transaction_type }}">{{ transaction.get_transaction_type_display }}</span>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+{% else %}
+    <article class="card app-empty-card">Nenhuma transacao cadastrada ainda.</article>
+{% endif %}

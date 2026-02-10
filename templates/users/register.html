@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastro | Financas{% endblock %}
+
+{% block content %}
+<section class="app-page mx-auto mt-6 max-w-md space-y-5">
+    <div>
+        <h1 class="app-title">Criar conta</h1>
+        <p class="app-subtitle">Comece a controlar suas receitas e despesas.</p>
+    </div>
+
+    <form method="post" class="card space-y-4">
+        {% include "partials/form_fields.html" %}
+        <button type="submit" class="app-btn-primary w-full">
+            Cadastrar
+        </button>
+    </form>
+
+    <p class="text-center app-muted-text">
+        Ja possui conta?
+        <a href="{% url 'users:login' %}" class="app-link-inline">Entrar</a>
+    </p>
+</section>
+{% endblock %}

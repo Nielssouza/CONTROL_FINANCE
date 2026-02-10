@@ -1,0 +1,168 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#6d28d9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Financas">
+    <title>{% block title %}Financas Pessoais{% endblock %}</title>
+
+    {% if not app_debug %}
+    <link rel="manifest" href="{% url 'manifest' %}">
+    {% endif %}
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "Segoe UI", "sans-serif"]
+                    },
+                    boxShadow: {
+                        app: "0 10px 30px -12px rgba(15, 23, 42, 0.28)"
+                    }
+                }
+            }
+        };
+    </script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-app text-slate-100 antialiased {% block body_class %}{% endblock %}">
+    <div class="mx-auto flex min-h-screen w-full max-w-md flex-col {% block shell_class %}app-shell{% endblock %}">
+        {% block page_header %}
+        <header class="app-header">
+            <div class="flex items-center justify-between">
+                <a href="{% url 'dashboard:home' %}" class="app-brand">Financas</a>
+                <div class="flex items-center gap-2">
+                    {% if user.is_authenticated %}
+                        <span class="app-user-chip">{{ user.username }}</span>
+                        <form method="post" action="{% url 'users:logout' %}">
+                            {% csrf_token %}
+                            <button class="app-mini-btn" type="submit">Sair</button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'users:login' %}" class="app-mini-btn app-mini-btn-primary">Entrar</a>
+                    {% endif %}
+                </div>
+            </div>
+        </header>
+        {% endblock %}
+
+        <main class="flex-1 {% block main_class %}px-4 pt-4 pb-28{% endblock %}">
+            {% if messages %}
+                <div class="mb-4 space-y-2">
+                    {% for message in messages %}
+                        <div class="app-flash">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    {% block floating_action %}{% endblock %}
+
+    {% block bottom_navigation %}
+    {% if user.is_authenticated %}
+        {% with current=request.path %}
+            <nav class="txn-bottom-nav">
+                <a href="{% url 'dashboard:home' %}" class="txn-tab-link {% if current == '/' %}txn-tab-active{% endif %}">
+                    <span class="txn-tab-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+                    </span>
+                    <span>Principal</span>
+                </a>
+
+                <a href="{% url 'transactions:statement' %}" class="txn-tab-link {% if current|slice:':14' == '/transactions/' %}txn-tab-active{% endif %}">
+                    <span class="txn-tab-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14"/><path d="M5 12h14"/><path d="M5 17h14"/></svg>
+                    </span>
+                    <span>Transacoes</span>
+                </a>
+
+                <button
+                    hx-get="{% url 'transactions:quick-add' %}"
+                    hx-target="#modal-content"
+                    hx-swap="innerHTML"
+                    class="txn-center-fab"
+                    aria-label="Adicionar transacao"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="txn-center-fab-icon" aria-hidden="true">
+                        <path d="M12 5v14"></path>
+                        <path d="M5 12h14"></path>
+                    </svg>
+                </button>
+
+                <a href="{% url 'accounts:list' %}" class="txn-tab-link {% if current|slice:':10' == '/accounts/' %}txn-tab-active{% endif %}">
+                    <span class="txn-tab-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg>
+                    </span>
+                    <span>Contas</span>
+                </a>
+
+                <a href="{% url 'categories:list' %}" class="txn-tab-link {% if current|slice:':12' == '/categories/' %}txn-tab-active{% endif %}">
+                    <span class="txn-tab-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+                    </span>
+                    <span>Categorias</span>
+                </a>
+            </nav>
+        {% endwith %}
+    {% endif %}
+    {% endblock %}
+
+    <div id="modal-backdrop" class="fixed inset-0 z-50 hidden items-end justify-center bg-slate-950/70 p-4">
+        <div class="app-modal-panel">
+            <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/app.js' %}"></script>
+<script>
+    (function () {
+        if (!("serviceWorker" in navigator)) {
+            return;
+        }
+
+        const isLocalHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+        const isDebug = {{ app_debug|yesno:"true,false" }};
+        const mustDisablePwa = isDebug || isLocalHost;
+
+        window.addEventListener("load", function () {
+            if (mustDisablePwa) {
+                navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                    registrations.forEach(function (registration) {
+                        registration.unregister();
+                    });
+                });
+
+                if ("caches" in window) {
+                    caches.keys().then(function (cacheNames) {
+                        cacheNames.forEach(function (cacheName) {
+                            caches.delete(cacheName);
+                        });
+                    });
+                }
+                return;
+            }
+
+            navigator.serviceWorker
+                .register("{% url 'service-worker' %}?v=3")
+                .then(function (registration) {
+                    registration.update();
+                })
+                .catch(function () {});
+        });
+    })();
+</script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

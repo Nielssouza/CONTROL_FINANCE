@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Entrar | Financas{% endblock %}
+
+{% block content %}
+<section class="app-page mx-auto mt-6 max-w-md space-y-5">
+    <div>
+        <h1 class="app-title">Entrar</h1>
+        <p class="app-subtitle">Acesse sua carteira financeira.</p>
+    </div>
+
+    <form method="post" class="card space-y-4">
+        {% include "partials/form_fields.html" %}
+        <button type="submit" class="app-btn-primary w-full">
+            Entrar
+        </button>
+    </form>
+
+    <p class="text-center app-muted-text">
+        Ainda nao possui conta?
+        <a href="{% url 'users:register' %}" class="app-link-inline">Cadastrar</a>
+    </p>
+</section>
+{% endblock %}
