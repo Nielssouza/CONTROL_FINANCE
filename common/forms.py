@@ -1,7 +1,7 @@
 from django import forms
 
 INPUT_CLASS = (
-    "w-full rounded-2xl border border-slate-700 bg-slate-900/85 px-4 py-3 text-sm "
+    "w-full min-w-0 rounded-2xl border border-slate-700 bg-slate-900/85 px-4 py-3 text-base sm:text-sm "
     "text-slate-100 placeholder:text-slate-500 shadow-sm focus:border-violet-500 "
     "focus:outline-none focus:ring-2 focus:ring-violet-500/30"
 )
