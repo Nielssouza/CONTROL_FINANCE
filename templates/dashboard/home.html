@@ -70,7 +70,18 @@
 {% endblock %}
 
 {% block content %}
-<section class="dash-screen">
+<div id="post-login-loader-overlay" class="post-login-loader-overlay{% if not show_post_login_loader %} hidden{% endif %}" role="status" aria-live="polite" aria-label="Carregando painel">
+    <div class="post-login-loader-card">
+        <div class="post-login-loader-ring" aria-hidden="true"></div>
+        <p class="post-login-loader-title">Bem-vindo ao Control</p>
+        <p class="post-login-loader-step" id="post-login-loader-step">Sincronizando painel...</p>
+        <div class="post-login-loader-progress" aria-hidden="true">
+            <span id="post-login-loader-bar"></span>
+        </div>
+    </div>
+</div>
+
+<section id="dash-main-screen" class="dash-screen{% if show_post_login_loader %} dash-screen-loader-lock{% endif %}">
     <article class="dash-hero-card">
         <div class="dash-hero-top">
             <div class="dash-due-menu" id="dash-due-menu">
@@ -106,7 +117,7 @@
                                 <div class="dash-due-item">
                                     <span class="dash-due-date">{{ item.date|date:"d/m" }}</span>
                                     <div class="dash-due-content">
-                                        <p class="dash-due-name">{{ item.description|default:"Despesa sem descricao" }}</p>
+                                        <p class="dash-due-name">{{ item.display_title }}</p>
                                         <p class="dash-due-sub">{{ item.account.name }}{% if item.category %} | {{ item.category.name }}{% endif %}</p>
                                     </div>
                                     <div class="dash-due-right">
@@ -156,6 +167,7 @@
                     {% if user.is_staff %}
                         <a href="{% url 'admin:index' %}" class="dash-user-menu-link">Admin</a>
                     {% endif %}
+                    <button type="button" class="dash-user-menu-link" data-view-mode-toggle>Modo navegador</button>
                     <form method="post" action="{% url 'users:logout' %}">
                         {% csrf_token %}
                         <button type="submit" class="dash-user-menu-logout">Sair</button>
@@ -165,7 +177,7 @@
         </div>
 
         <p class="dash-balance-label">Saldo atual em contas</p>
-        <h1 class="dash-balance-value" data-sensitive-value data-mask="R$ ****">{{ total_balance|brl }}</h1>
+        <h1 class="dash-balance-value{% if total_balance < 0 %} dash-balance-value-negative{% endif %}" data-sensitive-value data-mask="R$ ****">{{ total_balance|brl }}</h1>
 
         <button
             type="button"
@@ -230,26 +242,28 @@
 
     <section class="dash-section">
         <h2 class="dash-section-title">{{ category_title }}</h2>
-        <article class="dash-category-card">
-            <div class="dash-donut-wrap" aria-hidden="true">
-                <div class="dash-donut" style="background: {{ category_donut_style }};"></div>
-                <div class="dash-donut-hole"></div>
-            </div>
+        <a href="{% url 'dashboard:charts' %}?month={{ selected_month_value }}" class="dash-category-card-link" aria-label="Abrir graficos">
+            <article class="dash-category-card dash-category-card-clickable">
+                <div class="dash-donut-wrap" aria-hidden="true">
+                    <div class="dash-donut" style="background: {{ category_donut_style }};"></div>
+                    <div class="dash-donut-hole"></div>
+                </div>
 
-            <div class="dash-legend">
-                {% if category_segments %}
-                    {% for item in category_segments %}
-                        <div class="dash-legend-item">
-                            <span class="dash-legend-dot" style="background-color: {{ item.color }};"></span>
-                            <span class="dash-legend-name">{{ item.name }}</span>
-                            <span class="dash-legend-amount" data-sensitive-value data-mask="R$ ****">{{ item.total|brl }}</span>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="dash-empty-text">{{ category_empty }}</p>
-                {% endif %}
-            </div>
-        </article>
+                <div class="dash-legend">
+                    {% if category_segments %}
+                        {% for item in category_segments %}
+                            <div class="dash-legend-item">
+                                <span class="dash-legend-dot" style="background-color: {{ item.color }};"></span>
+                                <span class="dash-legend-name">{{ item.name }}</span>
+                                <span class="dash-legend-amount" data-sensitive-value data-mask="R$ ****">{{ item.total|brl }}</span>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="dash-empty-text">{{ category_empty }}</p>
+                    {% endif %}
+                </div>
+            </article>
+        </a>
     </section>
 
     <section class="dash-section">
@@ -308,6 +322,63 @@
 {% block extra_js %}
 <script>
     (function () {
+        const shouldShowPostLoginLoader = {{ show_post_login_loader|yesno:"true,false" }};
+        const postLoginOverlay = document.getElementById("post-login-loader-overlay");
+        const postLoginBar = document.getElementById("post-login-loader-bar");
+        const postLoginStep = document.getElementById("post-login-loader-step");
+        const dashMainScreen = document.getElementById("dash-main-screen");
+
+        const runPostLoginLoader = () => {
+            if (!postLoginOverlay || !postLoginBar || !postLoginStep) {
+                return;
+            }
+
+            if (!shouldShowPostLoginLoader) {
+                return;
+            }
+
+            postLoginOverlay.classList.remove("hidden");
+
+            const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            const duration = reduceMotion ? 260 : 980;
+            const steps = [
+                "Sincronizando painel...",
+                "Carregando saldos...",
+                "Montando graficos...",
+                "Tudo pronto.",
+            ];
+
+            const finish = () => {
+                postLoginOverlay.classList.add("is-exiting");
+                window.setTimeout(() => {
+                    postLoginOverlay.remove();
+                    if (dashMainScreen) {
+                        dashMainScreen.classList.remove("dash-screen-loader-lock");
+                    }
+                }, 240);
+            };
+
+            const start = performance.now();
+            const tick = (now) => {
+                const ratio = Math.min(1, (now - start) / duration);
+                const percent = Math.round(ratio * 100);
+                postLoginBar.style.width = `${percent}%`;
+                const stepIndex = Math.min(steps.length - 1, Math.floor(ratio * steps.length));
+                postLoginStep.textContent = steps[stepIndex];
+
+                if (ratio >= 1) {
+                    finish();
+                    return;
+                }
+
+                window.requestAnimationFrame(tick);
+            };
+
+            window.requestAnimationFrame(tick);
+        };
+
+        runPostLoginLoader();
+
         const toggleButton = document.getElementById("dash-visibility-toggle");
         if (toggleButton) {
             const STORAGE_KEY = "finance_values_hidden";
@@ -402,12 +473,4 @@
     })();
 </script>
 {% endblock %}
-
-
-
-
-
-
-
-
 

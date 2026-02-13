@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% load formatters %}
+
+{% block title %}Graficos | Control{% endblock %}
+{% block body_class %}transactions-body{% endblock %}
+{% block shell_class %}transactions-shell{% endblock %}
+{% block page_header %}{% endblock %}
+{% block main_class %}px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-36{% endblock %}
+{% block floating_action %}{% endblock %}
+
+{% block bottom_navigation %}
+{% if user.is_authenticated %}
+<nav class="txn-bottom-nav">
+    <a href="{% url 'dashboard:home' %}" class="txn-tab-link txn-tab-active">
+        <span class="txn-tab-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        </span>
+        <span>Principal</span>
+    </a>
+
+    <a href="{% url 'transactions:statement' %}" class="txn-tab-link">
+        <span class="txn-tab-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14"/><path d="M5 12h14"/><path d="M5 17h14"/></svg>
+        </span>
+        <span>Transacoes</span>
+    </a>
+
+    <button
+        hx-get="{% url 'transactions:quick-add' %}"
+        hx-target="#modal-content"
+        hx-swap="innerHTML"
+        class="txn-center-fab"
+        aria-label="Adicionar transacao"
+    >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="txn-center-fab-icon" aria-hidden="true">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+        </svg>
+    </button>
+
+    <a href="{% url 'accounts:list' %}" class="txn-tab-link">
+        <span class="txn-tab-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg>
+        </span>
+        <span>Contas</span>
+    </a>
+
+    <a href="{% url 'categories:list' %}" class="txn-tab-link">
+        <span class="txn-tab-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+        </span>
+        <span>Categorias</span>
+    </a>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="charts-screen">
+    <header class="charts-topbar">
+        <a href="{% url 'dashboard:home' %}?month={{ selected_month_value }}" class="charts-circle-btn" aria-label="Voltar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M15 18l-6-6 6-6"/></svg>
+        </a>
+
+        <h1 class="charts-title">Graficos</h1>
+
+        <a href="{% url 'transactions:statement' %}?month={{ selected_month_value }}" class="charts-circle-btn" aria-label="Filtrar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h18l-7 8v6l-4-2v-4L3 5z"/></svg>
+        </a>
+    </header>
+
+    <div class="charts-segmented" role="tablist" aria-label="Visualizacao de graficos">
+        <button type="button" class="charts-segment-btn{% if selected_chart_mode == "donut" %} charts-segment-btn-active{% endif %}" data-chart-toggle="donut" aria-label="Pizza">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2v10h10"/><path d="M20.6 13A9 9 0 1 1 11 3.1"/></svg>
+        </button>
+        <button type="button" class="charts-segment-btn{% if selected_chart_mode == "trend" %} charts-segment-btn-active{% endif %}" data-chart-toggle="trend" aria-label="Linha">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 12h4l2-5 3 10 2-5h7"/></svg>
+        </button>
+        <button type="button" class="charts-segment-btn{% if selected_chart_mode == "list" %} charts-segment-btn-active{% endif %}" data-chart-toggle="list" aria-label="Ranking">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 18v-3"/><path d="M12 18V8"/><path d="M19 18V5"/></svg>
+        </button>
+    </div>
+
+    <section class="charts-pane{% if selected_chart_mode != "donut" %} hidden{% endif %}" id="charts-pane-donut">
+        <article class="charts-card">
+            <div class="charts-month-nav" aria-label="Navegacao do mes">
+                <a href="?{{ prev_month_query }}" class="charts-month-arrow" aria-label="Mes anterior">&lsaquo;</a>
+                <p class="charts-month-title">{{ selected_month_label }}</p>
+                <a href="?{{ next_month_query }}" class="charts-month-arrow" aria-label="Mes seguinte">&rsaquo;</a>
+            </div>
+
+            {% if charts_items %}
+                <div class="charts-donut-grid">
+                    <div class="charts-donut" style="background: {{ charts_donut_style }};">
+                        <div class="charts-donut-center">
+                            <span class="charts-donut-label">Total</span>
+                            <strong class="charts-donut-value" data-sensitive-value data-mask="R$ ****">{{ charts_total|brl }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-list-wrap charts-list-preview">
+                    {% for item in charts_items|slice:":4" %}
+                        <div class="charts-list-row">
+                            <span class="charts-rank">{{ item.rank }}&ordm;</span>
+                            <span class="charts-list-icon" style="background-color: {{ item.color }};">{{ item.icon_letter }}</span>
+                            <div class="charts-list-main">
+                                <p class="charts-list-name">{{ item.name }}</p>
+                                <p class="charts-list-meta">Porcentagem</p>
+                            </div>
+                            <div class="charts-list-right">
+                                <p class="charts-list-amount" data-sensitive-value data-mask="R$ ****">{{ item.total|brl }}</p>
+                                <p class="charts-list-percent">{{ item.percent_label }}%</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="dash-empty-text">Sem despesas no periodo selecionado.</p>
+            {% endif %}
+        </article>
+    </section>
+
+    <section class="charts-pane{% if selected_chart_mode != "trend" %} hidden{% endif %}" id="charts-pane-trend">
+        <article class="charts-card charts-trend-card">
+            <div class="charts-month-nav" aria-label="Navegacao do mes">
+                <a href="?{{ prev_month_query }}" class="charts-month-arrow" aria-label="Mes anterior">&lsaquo;</a>
+                <p class="charts-month-title">{{ selected_month_label }}</p>
+                <a href="?{{ next_month_query }}" class="charts-month-arrow" aria-label="Mes seguinte">&rsaquo;</a>
+            </div>
+
+            <div class="charts-trend-head">
+                <h2 class="charts-ranking-title">Evolucao de despesas</h2>
+                <span class="charts-ranking-scope">Ultimos 6 meses</span>
+            </div>
+
+            {% if trend_points %}
+                <div class="charts-trend-grid">
+                    {% for point in trend_points %}
+                        <div class="charts-trend-col{% if point.is_current %} charts-trend-col-current{% endif %}">
+                            <div class="charts-trend-bar-wrap">
+                                <span class="charts-trend-bar" style="height: {{ point.height_percent|floatformat:2 }}%;"></span>
+                            </div>
+                            <p class="charts-trend-label">{{ point.label }}</p>
+                            <p class="charts-trend-value" data-sensitive-value data-mask="R$ ****">{{ point.total|brl }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="dash-empty-text">Sem dados para tendencia.</p>
+            {% endif %}
+        </article>
+    </section>
+
+    <section class="charts-pane{% if selected_chart_mode != "list" %} hidden{% endif %}" id="charts-pane-list">
+        <article class="charts-card charts-list-card">
+            <div class="charts-month-nav" aria-label="Navegacao do mes">
+                <a href="?{{ prev_month_query }}" class="charts-month-arrow" aria-label="Mes anterior">&lsaquo;</a>
+                <p class="charts-month-title">{{ selected_month_label }}</p>
+                <a href="?{{ next_month_query }}" class="charts-month-arrow" aria-label="Mes seguinte">&rsaquo;</a>
+            </div>
+
+            <div class="charts-ranking-head">
+                <h2 class="charts-ranking-title">Ranking de maiores despesas</h2>
+                <span class="charts-ranking-scope">{{ ranking_scope_label }}</span>
+            </div>
+
+            {% if ranking_scope_note %}
+                <p class="charts-ranking-note">{{ ranking_scope_note }}</p>
+            {% endif %}
+
+            {% if charts_items %}
+                <div class="charts-list-wrap">
+                    {% for item in charts_items %}
+                        <div class="charts-list-row">
+                            <span class="charts-rank">{{ item.rank }}&ordm;</span>
+                            <span class="charts-list-icon" style="background-color: {{ item.color }};">{{ item.icon_letter }}</span>
+                            <div class="charts-list-main">
+                                <p class="charts-list-name">{{ item.name }}</p>
+                                <p class="charts-list-meta">Porcentagem</p>
+                            </div>
+                            <div class="charts-list-right">
+                                <p class="charts-list-amount" data-sensitive-value data-mask="R$ ****">{{ item.total|brl }}</p>
+                                <p class="charts-list-percent">{{ item.percent_label }}%</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="dash-empty-text">Sem despesas cadastradas para montar ranking.</p>
+            {% endif %}
+        </article>
+    </section>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const panes = {
+            donut: document.getElementById("charts-pane-donut"),
+            trend: document.getElementById("charts-pane-trend"),
+            list: document.getElementById("charts-pane-list"),
+        };
+        const toggles = Array.from(document.querySelectorAll("[data-chart-toggle]"));
+
+        if (!panes.donut || !panes.trend || !panes.list || !toggles.length) {
+            return;
+        }
+
+        const monthNavLinks = Array.from(document.querySelectorAll(".charts-month-arrow"));
+
+        const syncModeInMonthLinks = (mode) => {
+            monthNavLinks.forEach((link) => {
+                const href = link.getAttribute("href");
+                if (!href) {
+                    return;
+                }
+                const url = new URL(href, window.location.href);
+                url.searchParams.set("mode", mode);
+                link.setAttribute("href", `${url.pathname}${url.search}`);
+            });
+        };
+
+        const syncModeInAddressBar = (mode) => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("mode", mode);
+            window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+        };
+
+        const setMode = (mode, syncUrl = true) => {
+            const activeMode = panes[mode] ? mode : "list";
+
+            Object.entries(panes).forEach(([name, pane]) => {
+                pane.classList.toggle("hidden", name !== activeMode);
+            });
+
+            toggles.forEach((button) => {
+                const active = button.dataset.chartToggle === activeMode;
+                button.classList.toggle("charts-segment-btn-active", active);
+                button.setAttribute("aria-selected", active ? "true" : "false");
+            });
+
+            syncModeInMonthLinks(activeMode);
+            if (syncUrl) {
+                syncModeInAddressBar(activeMode);
+            }
+        };
+
+        toggles.forEach((button) => {
+            button.addEventListener("click", function () {
+                setMode(button.dataset.chartToggle, true);
+            });
+        });
+
+        setMode("{{ selected_chart_mode|default:'list' }}", false);
+    })();
+</script>
+{% endblock %}

@@ -27,7 +27,7 @@
 
         const recurrenceField = form.querySelector('[name="recurrence_type"]');
         const installmentField = form.querySelector('[name="installment_count"]');
-        const intervalField = form.querySelector('[name="recurrence_interval"]');
+        const intervalUnitField = form.querySelector('[name="recurrence_interval_unit"]');
         const txTypeField = form.querySelector('[name="transaction_type"]');
         const destField = form.querySelector('[name="destination_account"]');
 
@@ -36,7 +36,7 @@
         }
 
         const installmentWrapper = installmentField ? installmentField.closest("div.space-y-1") : null;
-        const intervalWrapper = intervalField ? intervalField.closest("div.space-y-1") : null;
+        const intervalUnitWrapper = intervalUnitField ? intervalUnitField.closest("div.space-y-1") : null;
         const destWrapper = destField ? destField.closest("div.space-y-1") : null;
 
         const toggleFields = function () {
@@ -47,8 +47,8 @@
                 installmentWrapper.classList.toggle("hidden", !isInstallment);
                             }
 
-            if (intervalWrapper) {
-                intervalWrapper.classList.toggle("hidden", !showInterval);
+            if (intervalUnitWrapper) {
+                intervalUnitWrapper.classList.toggle("hidden", !showInterval);
             }
         };
 

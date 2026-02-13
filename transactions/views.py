@@ -4,12 +4,14 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, HttpResponseRedirect
-from django.urls import reverse_lazy
+from django.shortcuts import get_object_or_404
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.formats import date_format
+from django.views import View
 from django.views.generic import CreateView, DeleteView, TemplateView, UpdateView
 
 from accounts.models import Account
@@ -94,6 +96,7 @@ class RecurrenceScopeMixin:
             description=reference_transaction.description,
             recurrence_type=reference_transaction.recurrence_type,
             recurrence_interval=reference_transaction.recurrence_interval,
+            recurrence_interval_unit=reference_transaction.recurrence_interval_unit,
             installment_count=reference_transaction.installment_count,
             is_cleared=False,
         )
@@ -109,17 +112,26 @@ class RecurrenceScopeMixin:
         return Transaction.objects.filter(user=self.request.user, pk__in=ids)
 
     def update_related_occurrences(self, reference_transaction, updated_transaction):
+        update_payload = {
+            "transaction_type": updated_transaction.transaction_type,
+            "amount": updated_transaction.amount,
+            "account": updated_transaction.account,
+            "destination_account": updated_transaction.destination_account,
+            "category": updated_transaction.category,
+            "description": updated_transaction.description,
+            "is_cleared": updated_transaction.is_cleared,
+            "recurrence_type": updated_transaction.recurrence_type,
+            "recurrence_interval": updated_transaction.recurrence_interval,
+            "recurrence_interval_unit": updated_transaction.recurrence_interval_unit,
+            "installment_count": updated_transaction.installment_count,
+        }
+        if updated_transaction.recurrence_type == Transaction.RecurrenceType.INSTALLMENT:
+            update_payload["installment_number"] = F("installment_number")
+        else:
+            update_payload["installment_number"] = None
+
         return self.get_related_occurrences_queryset(reference_transaction).update(
-            transaction_type=updated_transaction.transaction_type,
-            amount=updated_transaction.amount,
-            account=updated_transaction.account,
-            destination_account=updated_transaction.destination_account,
-            category=updated_transaction.category,
-            description=updated_transaction.description,
-            is_cleared=updated_transaction.is_cleared,
-            recurrence_type=updated_transaction.recurrence_type,
-            recurrence_interval=updated_transaction.recurrence_interval,
-            installment_count=updated_transaction.installment_count,
+            **update_payload
         )
 
     def delete_related_occurrences(self, reference_transaction):
@@ -292,8 +304,8 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
             'oldest': ['date', 'created_at'],
             'amount_desc': ['-amount', '-date'],
             'amount_asc': ['amount', '-date'],
-            'pending': ['is_cleared', '-date'],
-            'cleared': ['-is_cleared', '-date'],
+            'pending': ['is_ignored', 'is_cleared', '-date'],
+            'cleared': ['is_ignored', '-is_cleared', '-date'],
         }
         queryset = queryset.order_by(*ordering_map.get(order_by, ['-date', '-created_at']))
 
@@ -323,6 +335,7 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
         available_transactions = Transaction.objects.filter(
             user=user,
             is_cleared=True,
+            is_ignored=False,
             date__lte=today,
         )
         total_income = available_transactions.filter(
@@ -335,6 +348,7 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
 
         monthly_queryset = Transaction.objects.filter(
             user=user,
+            is_ignored=False,
             date__year=selected_month.year,
             date__month=selected_month.month,
         )
@@ -390,6 +404,9 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
         context["selected_category_id"] = self.request.GET.get("category", "")
         context["current_balance"] = current_balance
         context["monthly_balance"] = monthly_balance
+        context["statement_return_url"] = (
+            f"{reverse('transactions:statement')}?{query_params.urlencode()}"
+        )
         return context
 
 
@@ -399,6 +416,46 @@ class StatementView(StatementViewBase):
 
 class StatementPartialView(StatementViewBase):
     template_name = "transactions/partials/statement_list.html"
+
+
+class TransactionToggleClearedView(LoginRequiredMixin, View):
+    success_url = reverse_lazy("transactions:statement")
+
+    def post(self, request, *args, **kwargs):
+        tx = get_object_or_404(Transaction, pk=kwargs.get("pk"), user=request.user)
+        tx.is_cleared = not tx.is_cleared
+        if tx.is_cleared:
+            tx.is_ignored = False
+        tx.save(update_fields=["is_cleared", "is_ignored", "updated_at"])
+
+        next_url = (request.POST.get("next") or "").strip()
+        if next_url.startswith("/transactions/partial/"):
+            next_url = next_url.replace("/transactions/partial/", "/transactions/", 1)
+        if not next_url.startswith("/"):
+            next_url = str(self.success_url)
+        return HttpResponseRedirect(next_url)
+
+
+class TransactionToggleIgnoredView(LoginRequiredMixin, View):
+    success_url = reverse_lazy("transactions:statement")
+
+    def post(self, request, *args, **kwargs):
+        tx = get_object_or_404(Transaction, pk=kwargs.get("pk"), user=request.user)
+
+        if tx.transaction_type != Transaction.TransactionType.EXPENSE:
+            messages.error(request, "Somente despesas podem ser ignoradas.")
+        else:
+            tx.is_ignored = not tx.is_ignored
+            if tx.is_ignored:
+                tx.is_cleared = False
+            tx.save(update_fields=["is_ignored", "is_cleared", "updated_at"])
+
+        next_url = (request.POST.get("next") or "").strip()
+        if next_url.startswith("/transactions/partial/"):
+            next_url = next_url.replace("/transactions/partial/", "/transactions/", 1)
+        if not next_url.startswith("/"):
+            next_url = str(self.success_url)
+        return HttpResponseRedirect(next_url)
 
 
 class QuickTransactionCreateView(

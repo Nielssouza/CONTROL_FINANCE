@@ -54,6 +54,7 @@ class Account(models.Model):
 
         posted_transactions = self.transactions.filter(
             is_cleared=True,
+            is_ignored=False,
             date__lte=today,
         )
         income = posted_transactions.filter(transaction_type="income").aggregate(
@@ -69,6 +70,7 @@ class Account(models.Model):
         incoming_transfers = self.incoming_transfers.filter(
             transaction_type="transfer",
             is_cleared=True,
+            is_ignored=False,
             date__lte=today,
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 

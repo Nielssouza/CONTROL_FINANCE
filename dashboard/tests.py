@@ -1,3 +1,98 @@
-from django.test import TestCase
+from datetime import date
+from decimal import Decimal
 
-# Create your tests here.
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+from accounts.models import Account
+from categories.models import Category
+from transactions.models import Transaction
+
+
+class DashboardChartsMonthScopeTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="tester",
+            password="secret123",
+        )
+        self.client.force_login(self.user)
+
+        self.account = Account.objects.create(
+            user=self.user,
+            name="Conta Principal",
+            account_type=Account.AccountType.BANK,
+            initial_balance=Decimal("0.00"),
+        )
+        self.category = Category.objects.create(
+            user=self.user,
+            name="Aluguel",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+
+    def test_charts_ranking_keeps_selected_month_scope(self):
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("1000.00"),
+            date=date(2026, 2, 10),
+            account=self.account,
+            category=self.category,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        response_feb = self.client.get(
+            reverse("dashboard:charts"),
+            {"month": "2026-02"},
+        )
+        self.assertEqual(response_feb.status_code, 200)
+        self.assertEqual(len(response_feb.context["charts_items"]), 1)
+        self.assertEqual(response_feb.context["charts_items"][0]["name"], "Aluguel")
+
+        response_jan = self.client.get(
+            reverse("dashboard:charts"),
+            {"month": "2026-01"},
+        )
+        self.assertEqual(response_jan.status_code, 200)
+        self.assertEqual(response_jan.context["charts_items"], [])
+        self.assertNotEqual(response_jan.context["ranking_scope_label"], "Geral")
+        self.assertContains(response_jan, "Sem despesas cadastradas para montar ranking.")
+
+    def test_charts_month_navigation_preserves_selected_mode(self):
+        response = self.client.get(
+            reverse("dashboard:charts"),
+            {"month": "2026-02", "mode": "trend"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_chart_mode"], "trend")
+        self.assertIn("mode=trend", response.context["prev_month_query"])
+        self.assertIn("mode=trend", response.context["next_month_query"])
+        self.assertContains(response, 'setMode("trend", false);')
+
+class DashboardPostLoginLoaderTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="login-loader-user",
+            password="strong-pass-123",
+        )
+
+    def test_post_login_loader_flag_is_consumed_once(self):
+        response = self.client.post(
+            reverse("users:login"),
+            {"username": "login-loader-user", "password": "strong-pass-123"},
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers.get("Location"), reverse("dashboard:home"))
+
+        first_home = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(first_home.status_code, 200)
+        self.assertTrue(first_home.context["show_post_login_loader"])
+
+        second_home = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(second_home.status_code, 200)
+        self.assertFalse(second_home.context["show_post_login_loader"])
+

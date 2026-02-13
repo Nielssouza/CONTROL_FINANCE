@@ -31,6 +31,10 @@ class UserLoginView(LoginView):
     authentication_form = StyledAuthenticationForm
     redirect_authenticated_user = True
 
+    def form_valid(self, form):
+        self.request.session["show_post_login_loader"] = True
+        return super().form_valid(form)
+
 
 class UserLogoutView(LogoutView):
     next_page = reverse_lazy("users:login")

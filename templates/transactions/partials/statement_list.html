@@ -6,7 +6,7 @@
                 <h3 class="txn-day-label">{{ transaction.date|date:"l, j"|title }}</h3>
             {% endifchanged %}
 
-            <article class="txn-item-row app-action-card" data-press-actions>
+            <article class="txn-item-row">
                 <div class="txn-item-icon-wrap">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="txn-item-icon-svg">
                         <rect x="5" y="3" width="14" height="18" rx="2"></rect>
@@ -17,7 +17,7 @@
                 </div>
 
                 <div class="flex-1 min-w-0">
-                    <p class="txn-item-title">{{ transaction.description|default:"Sem descricao" }}</p>
+                    <p class="txn-item-title">{{ transaction.display_title }}</p>
                     <p class="txn-item-meta">
                         {% if transaction.category %}
                             {{ transaction.category.name }}
@@ -25,7 +25,9 @@
                             Sem categoria
                         {% endif %}
                         | {{ transaction.account.name }}
-                        {% if transaction.is_cleared %}
+                        {% if transaction.is_ignored %}
+                            | Ignorada
+                        {% elif transaction.is_cleared %}
                             | Baixada
                         {% else %}
                             | Pendente
@@ -33,18 +35,47 @@
                     </p>
                 </div>
 
-                <div class="text-right">
+                <div class="txn-item-right">
                     {% if transaction.transaction_type == "expense" %}
-                        <p class="txn-amount txn-amount-expense">{{ transaction.amount|brl }}</p>
+                        <p class="txn-amount txn-amount-expense{% if transaction.is_cleared %} txn-amount-cleared{% endif %}{% if transaction.is_ignored %} txn-amount-ignored{% endif %}">{{ transaction.amount|brl }}</p>
                     {% elif transaction.transaction_type == "income" %}
                         <p class="txn-amount txn-amount-income">{{ transaction.amount|brl }}</p>
                     {% else %}
                         <p class="txn-amount txn-amount-transfer">{{ transaction.amount|brl }}</p>
                     {% endif %}
-                    <div class="app-inline-actions justify-end mt-1">
-                        <a href="{% url 'transactions:update' transaction.pk %}" class="app-link-edit" aria-label="Editar transacao">Editar</a>
-                        <a href="{% url 'transactions:delete' transaction.pk %}" class="app-link-danger" aria-label="Excluir transacao">Excluir</a>
-                    </div>
+
+                    <details class="txn-actions-dropdown" data-txn-actions>
+                        <summary class="txn-actions-trigger" aria-label="Acoes da transacao" title="Acoes">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <circle cx="12" cy="5" r="1.8"></circle>
+                                <circle cx="12" cy="12" r="1.8"></circle>
+                                <circle cx="12" cy="19" r="1.8"></circle>
+                            </svg>
+                        </summary>
+
+                        <div class="txn-actions-menu">
+                            <form method="post" action="{% url 'transactions:toggle-cleared' transaction.pk %}" class="txn-actions-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ statement_return_url|default:request.get_full_path }}">
+                                <button type="submit" class="txn-menu-item txn-menu-item-clear{% if transaction.is_cleared %} txn-menu-item-clear-active{% endif %}">
+                                    {% if transaction.is_cleared %}Baixada{% else %}Baixar{% endif %}
+                                </button>
+                            </form>
+
+                            {% if transaction.transaction_type == "expense" %}
+                                <form method="post" action="{% url 'transactions:toggle-ignored' transaction.pk %}" class="txn-actions-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ statement_return_url|default:request.get_full_path }}">
+                                    <button type="submit" class="txn-menu-item txn-menu-item-ignore{% if transaction.is_ignored %} txn-menu-item-ignore-active{% endif %}">
+                                        {% if transaction.is_ignored %}Reativar{% else %}Ignorar{% endif %}
+                                    </button>
+                                </form>
+                            {% endif %}
+
+                            <a href="{% url 'transactions:update' transaction.pk %}" class="txn-menu-item txn-menu-item-edit">Editar</a>
+                            <a href="{% url 'transactions:delete' transaction.pk %}" class="txn-menu-item txn-menu-item-delete">Excluir</a>
+                        </div>
+                    </details>
                 </div>
             </article>
         {% endfor %}
@@ -54,6 +85,3 @@
         Nenhuma transacao encontrada para os filtros selecionados.
     </article>
 {% endif %}
-
-
-

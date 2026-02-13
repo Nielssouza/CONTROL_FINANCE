@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -13,7 +13,7 @@
     {% if not app_debug %}
     <link rel="manifest" href="{% url 'manifest' %}">
     {% endif %}
-    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260213m">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -34,12 +34,13 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-app text-slate-100 antialiased {% block body_class %}{% endblock %}">
-    <div class="mx-auto flex min-h-screen w-full max-w-md flex-col {% block shell_class %}app-shell{% endblock %}">
+    <div class="mx-auto flex min-h-screen w-full flex-col app-shell-frame {% block shell_class %}app-shell{% endblock %}">
         {% block page_header %}
         <header class="app-header">
             <div class="flex items-center justify-between">
                 <a href="{% url 'dashboard:home' %}" class="app-brand">Control</a>
                 <div class="flex items-center gap-2">
+                    <button class="app-mini-btn app-mini-btn-view" type="button" data-view-mode-toggle aria-label="Alternar modo de visualizacao">Modo navegador</button>
                     {% if user.is_authenticated %}
                         <span class="app-user-chip">{{ user.username }}</span>
                         <form method="post" action="{% url 'users:logout' %}">
@@ -124,7 +125,7 @@
         </div>
     </div>
 
-    <script src="{% static 'js/app.js' %}"></script>
+    <script src="{% static 'js/app.js' %}?v=20260213m"></script>
 <script>
     (function () {
         if (!("serviceWorker" in navigator)) {
@@ -165,4 +166,9 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+
+
+
+
+
 

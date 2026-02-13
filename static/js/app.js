@@ -6,6 +6,10 @@
         currency: "BRL",
     });
 
+    const VIEW_MODE_KEY = "control_view_mode";
+    const VIEW_MODE_MOBILE = "mobile";
+    const VIEW_MODE_BROWSER = "browser";
+
     const parseAmountToCents = (value) => {
         const raw = (value || "").toString();
         const digitsOnly = raw.replace(/\D/g, "");
@@ -89,6 +93,7 @@
             document.addEventListener("pointerdown", (event) => {
                 if (!event.target.closest("[data-press-actions]")) {
                     closeActionCards();
+                    closeTransactionActionMenus();
                 }
             });
         }
@@ -143,6 +148,103 @@
         });
     };
 
+    const getStoredViewMode = () => {
+        try {
+            const stored = window.localStorage.getItem(VIEW_MODE_KEY);
+            return stored === VIEW_MODE_BROWSER ? VIEW_MODE_BROWSER : VIEW_MODE_MOBILE;
+        } catch {
+            return VIEW_MODE_MOBILE;
+        }
+    };
+
+    const persistViewMode = (mode) => {
+        try {
+            window.localStorage.setItem(VIEW_MODE_KEY, mode);
+        } catch {}
+    };
+
+    const applyViewMode = (mode) => {
+        const resolvedMode = mode === VIEW_MODE_BROWSER ? VIEW_MODE_BROWSER : VIEW_MODE_MOBILE;
+        document.documentElement.classList.toggle("view-browser", resolvedMode === VIEW_MODE_BROWSER);
+        document.documentElement.classList.toggle("view-mobile", resolvedMode !== VIEW_MODE_BROWSER);
+
+        const nextLabel = resolvedMode === VIEW_MODE_BROWSER ? "Modo celular" : "Modo navegador";
+        document.querySelectorAll("[data-view-mode-toggle]").forEach((toggleButton) => {
+            if (!(toggleButton instanceof HTMLElement)) {
+                return;
+            }
+            toggleButton.textContent = nextLabel;
+            toggleButton.setAttribute("aria-label", nextLabel);
+            toggleButton.dataset.viewModeCurrent = resolvedMode;
+        });
+    };
+
+    const toggleViewMode = () => {
+        const currentMode = getStoredViewMode();
+        const nextMode = currentMode === VIEW_MODE_BROWSER ? VIEW_MODE_MOBILE : VIEW_MODE_BROWSER;
+        persistViewMode(nextMode);
+        applyViewMode(nextMode);
+    };
+
+    const initViewModeToggles = (root = document) => {
+        const toggles = root.querySelectorAll("[data-view-mode-toggle]");
+        if (!toggles.length) {
+            return;
+        }
+
+        toggles.forEach((toggleButton) => {
+            if (!(toggleButton instanceof HTMLElement) || toggleButton.dataset.viewModeReady === "1") {
+                return;
+            }
+
+            toggleButton.dataset.viewModeReady = "1";
+            toggleButton.addEventListener("click", () => {
+                toggleViewMode();
+            });
+        });
+
+        applyViewMode(getStoredViewMode());
+    };
+
+    const closeTransactionActionMenus = (exceptMenu = null) => {
+        document.querySelectorAll("details[data-txn-actions][open]").forEach((menu) => {
+            if (menu !== exceptMenu) {
+                menu.removeAttribute("open");
+            }
+        });
+    };
+
+    let txnMenuOutsideBound = false;
+
+    const initTransactionActionMenus = (root = document) => {
+        const menus = root.querySelectorAll("details[data-txn-actions]");
+        if (!menus.length) {
+            return;
+        }
+
+        if (!txnMenuOutsideBound) {
+            txnMenuOutsideBound = true;
+            document.addEventListener("pointerdown", (event) => {
+                if (!event.target.closest("details[data-txn-actions]")) {
+                    closeTransactionActionMenus();
+                }
+            });
+        }
+
+        menus.forEach((menu) => {
+            if (menu.dataset.dropdownReady === "1") {
+                return;
+            }
+
+            menu.dataset.dropdownReady = "1";
+            menu.addEventListener("toggle", () => {
+                if (menu.open) {
+                    closeTransactionActionMenus(menu);
+                }
+            });
+        });
+    };
+
     const openModal = () => {
         if (!backdrop) {
             return;
@@ -178,6 +280,8 @@
         if (event.detail && event.detail.target) {
             initCurrencyMasks(event.detail.target);
             initPressActions(event.detail.target);
+            initTransactionActionMenus(event.detail.target);
+            initViewModeToggles(event.detail.target);
         }
 
         if (
@@ -218,9 +322,13 @@
         if (event.key === "Escape") {
             closeModal();
             closeActionCards();
+            closeTransactionActionMenus();
         }
     });
 
     initCurrencyMasks(document);
     initPressActions(document);
+    initTransactionActionMenus(document);
+    initViewModeToggles(document);
+    applyViewMode(getStoredViewMode());
 })();

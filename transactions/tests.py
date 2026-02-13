@@ -66,6 +66,7 @@ class TransactionScopeAndMonthLockTests(TestCase):
             "recurrence_type": Transaction.RecurrenceType.FIXED,
             "installment_count": "",
             "recurrence_interval": "1",
+            "recurrence_interval_unit": Transaction.IntervalUnit.MONTH,
             "unlock_password": "",
         }
         data.update(overrides)
@@ -84,6 +85,7 @@ class TransactionScopeAndMonthLockTests(TestCase):
             "recurrence_type": Transaction.RecurrenceType.FIXED,
             "installment_count": "",
             "recurrence_interval": "1",
+            "recurrence_interval_unit": Transaction.IntervalUnit.MONTH,
             "unlock_password": "",
         }
         data.update(overrides)
@@ -126,7 +128,7 @@ class TransactionScopeAndMonthLockTests(TestCase):
         self.assertEqual(self.feb.description, "Salario principal")
         self.assertEqual(self.mar.description, "Salario principal")
 
-    def test_update_closed_month_requires_password(self):
+    def test_update_closed_month_allows_change_without_password(self):
         self._close_month(2026, 2)
         payload = self._build_edit_payload(description="Novo texto", scope="current")
 
@@ -135,9 +137,9 @@ class TransactionScopeAndMonthLockTests(TestCase):
             data=payload,
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
         self.feb.refresh_from_db()
-        self.assertEqual(self.feb.description, "Salarios")
+        self.assertEqual(self.feb.description, "Novo texto")
 
     def test_update_closed_month_with_password_allows_change(self):
         self._close_month(2026, 2)
@@ -180,7 +182,7 @@ class TransactionScopeAndMonthLockTests(TestCase):
         self.assertFalse(Transaction.objects.filter(pk=self.feb.pk).exists())
         self.assertFalse(Transaction.objects.filter(pk=self.mar.pk).exists())
 
-    def test_delete_closed_month_requires_password(self):
+    def test_delete_closed_month_allows_deletion_without_password(self):
         self._close_month(2026, 2)
 
         response = self.client.post(
@@ -188,8 +190,8 @@ class TransactionScopeAndMonthLockTests(TestCase):
             data={"scope": "current", "unlock_password": ""},
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(Transaction.objects.filter(pk=self.feb.pk).exists())
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Transaction.objects.filter(pk=self.feb.pk).exists())
 
     def test_delete_cleared_transaction_is_blocked(self):
         self.feb.is_cleared = True
@@ -203,7 +205,7 @@ class TransactionScopeAndMonthLockTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Transaction.objects.filter(pk=self.feb.pk).exists())
 
-    def test_create_closed_month_requires_password(self):
+    def test_create_closed_month_allows_creation_without_password(self):
         self._close_month(2026, 2)
 
         response = self.client.post(
@@ -211,14 +213,208 @@ class TransactionScopeAndMonthLockTests(TestCase):
             data=self._build_create_payload(),
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
             Transaction.objects.filter(
                 user=self.user,
                 date=date(2026, 2, 5),
                 description="Extra",
             ).exists()
         )
+
+
+    def test_pending_expense_uses_cleared_style_only_when_baixada(self):
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Aluguel",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("50.00"),
+            date=date(2026, 2, 15),
+            account=self.account,
+            category=expense_category,
+            description="Despesa pendente",
+            is_cleared=False,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("70.00"),
+            date=date(2026, 2, 16),
+            account=self.account,
+            category=expense_category,
+            description="Despesa baixada",
+            is_cleared=True,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        response = self.client.get(
+            reverse("transactions:statement"),
+            {"month": "2026-02"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="txn-amount txn-amount-expense">R$ 50,00</p>', html=False)
+        self.assertContains(response, 'class="txn-amount txn-amount-expense txn-amount-cleared">R$ 70,00</p>', html=False)
+
+    def test_generate_future_occurrences_respects_day_unit(self):
+        tx = Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.INCOME,
+            amount=Decimal("10.00"),
+            date=date(2026, 2, 1),
+            account=self.account,
+            category=self.category,
+            description="Fixa em dias",
+            recurrence_type=Transaction.RecurrenceType.FIXED,
+            recurrence_interval=10,
+            recurrence_interval_unit=Transaction.IntervalUnit.DAY,
+            is_cleared=False,
+        )
+
+        created_count = tx.generate_future_occurrences()
+
+        self.assertGreater(created_count, 0)
+        self.assertTrue(
+            Transaction.objects.filter(
+                user=self.user,
+                description="Fixa em dias",
+                date=date(2026, 2, 11),
+            ).exists()
+        )
+
+
+    def test_installment_transactions_get_sequential_numbers(self):
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Curso",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        tx = Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("100.00"),
+            date=date(2026, 2, 20),
+            account=self.account,
+            category=expense_category,
+            description="Curso online",
+            recurrence_type=Transaction.RecurrenceType.INSTALLMENT,
+            recurrence_interval_unit=Transaction.IntervalUnit.MONTH,
+            installment_count=3,
+            is_cleared=False,
+        )
+
+        created_count = tx.generate_future_occurrences()
+
+        self.assertEqual(created_count, 2)
+        installments = list(
+            Transaction.objects.filter(
+                user=self.user,
+                description="Curso online",
+            ).order_by("date")
+        )
+        self.assertEqual([item.installment_number for item in installments], [1, 2, 3])
+
+    def test_statement_shows_installment_fraction_in_title(self):
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Parcelado",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        tx = Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("150.00"),
+            date=date(2026, 2, 21),
+            account=self.account,
+            category=expense_category,
+            description="Notebook",
+            recurrence_type=Transaction.RecurrenceType.INSTALLMENT,
+            recurrence_interval_unit=Transaction.IntervalUnit.MONTH,
+            installment_count=3,
+            is_cleared=False,
+        )
+        tx.generate_future_occurrences()
+
+        feb_response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
+        mar_response = self.client.get(reverse("transactions:statement"), {"month": "2026-03"})
+
+        self.assertEqual(feb_response.status_code, 200)
+        self.assertEqual(mar_response.status_code, 200)
+        self.assertContains(feb_response, "Notebook (1/3)")
+        self.assertContains(mar_response, "Notebook (2/3)")
+
+    def test_toggle_ignored_expense_excludes_from_monthly_balance(self):
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Internet",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        expense = Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("500.00"),
+            date=date(2026, 2, 12),
+            account=self.account,
+            category=expense_category,
+            description="Internet",
+            is_cleared=False,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        before_response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
+        self.assertEqual(before_response.status_code, 200)
+        self.assertEqual(before_response.context["monthly_balance"], Decimal("6500.00"))
+
+        toggle_response = self.client.post(
+            reverse("transactions:toggle-ignored", args=[expense.pk]),
+            data={"next": "/transactions/?month=2026-02"},
+        )
+        self.assertEqual(toggle_response.status_code, 302)
+
+        expense.refresh_from_db()
+        self.assertTrue(expense.is_ignored)
+
+        after_response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
+        self.assertEqual(after_response.status_code, 200)
+        self.assertEqual(after_response.context["monthly_balance"], Decimal("7000.00"))
+
+    def test_toggle_cleared_removes_ignored_flag_and_sets_baixada(self):
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Condominio",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        expense = Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("200.00"),
+            date=date(2026, 2, 18),
+            account=self.account,
+            category=expense_category,
+            description="Condominio",
+            is_cleared=False,
+            is_ignored=True,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        response = self.client.post(
+            reverse("transactions:toggle-cleared", args=[expense.pk]),
+            data={"next": "/transactions/?month=2026-02"},
+        )
+        self.assertEqual(response.status_code, 302)
+
+        expense.refresh_from_db()
+        self.assertTrue(expense.is_cleared)
+        self.assertFalse(expense.is_ignored)
+
+
 
     def test_create_closed_month_with_password_allows_creation(self):
         self._close_month(2026, 2)

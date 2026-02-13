@@ -39,7 +39,7 @@ class TransactionForm(forms.ModelForm):
             "description",
             "recurrence_type",
             "installment_count",
-            "recurrence_interval",
+            "recurrence_interval_unit",
         )
         labels = {
             "transaction_type": "Tipo",
@@ -51,7 +51,7 @@ class TransactionForm(forms.ModelForm):
             "description": "Descricao",
             "recurrence_type": "Recorrencia",
             "installment_count": "Quantidade de parcelas",
-            "recurrence_interval": "Intervalo (dias)",
+            "recurrence_interval_unit": "Unidade do intervalo",
         }
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
@@ -71,6 +71,16 @@ class TransactionForm(forms.ModelForm):
             ]
             if not self.instance.pk and not self.is_bound:
                 self.fields["recurrence_type"].initial = Transaction.RecurrenceType.ONCE
+
+        if "recurrence_interval_unit" in self.fields:
+            self.fields["recurrence_interval_unit"].choices = [
+                (Transaction.IntervalUnit.DAY, "Dias"),
+                (Transaction.IntervalUnit.MONTH, "Mes"),
+                (Transaction.IntervalUnit.YEAR, "Ano"),
+            ]
+            self.fields["recurrence_interval_unit"].required = False
+            if not self.instance.pk and not self.is_bound:
+                self.fields["recurrence_interval_unit"].initial = Transaction.IntervalUnit.MONTH
 
         if self.instance and self.instance.pk and "amount" in self.fields:
             self.initial["amount"] = f"{self.instance.amount:.2f}"
@@ -99,12 +109,6 @@ class TransactionForm(forms.ModelForm):
             self.fields["installment_count"].required = False
             self.fields["installment_count"].widget.attrs.update(
                 {"min": "2", "step": "1", "placeholder": "Ex.: 12"}
-            )
-
-        if "recurrence_interval" in self.fields:
-            self.fields["recurrence_interval"].help_text = "Informe em dias (ex.: 30)."
-            self.fields["recurrence_interval"].widget.attrs.update(
-                {"min": "1", "step": "1", "placeholder": "Ex.: 30"}
             )
 
         style_form_fields(self)
@@ -151,6 +155,25 @@ class TransactionForm(forms.ModelForm):
         if recurrence_type != Transaction.RecurrenceType.INSTALLMENT:
             cleaned_data["installment_count"] = None
 
+        cleaned_data["recurrence_interval"] = 1
+        self.instance.recurrence_interval = 1
+
+        interval_unit = (
+            cleaned_data.get("recurrence_interval_unit") or Transaction.IntervalUnit.MONTH
+        )
+        if interval_unit not in {
+            Transaction.IntervalUnit.DAY,
+            Transaction.IntervalUnit.MONTH,
+            Transaction.IntervalUnit.YEAR,
+        }:
+            self.add_error("recurrence_interval_unit", "Unidade de intervalo invalida.")
+            interval_unit = Transaction.IntervalUnit.MONTH
+        cleaned_data["recurrence_interval_unit"] = interval_unit
+
+        if recurrence_type == Transaction.RecurrenceType.ONCE:
+            cleaned_data["recurrence_interval"] = 1
+            cleaned_data["recurrence_interval_unit"] = Transaction.IntervalUnit.MONTH
+
         return cleaned_data
 
 
@@ -166,6 +189,7 @@ class QuickTransactionForm(TransactionForm):
             "category",
             "recurrence_type",
             "installment_count",
+            "recurrence_interval_unit",
             "description",
         )
 

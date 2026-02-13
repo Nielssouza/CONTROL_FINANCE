@@ -118,6 +118,96 @@ class DashboardContextMixin(LoginRequiredMixin):
 
         return segments, f"conic-gradient({', '.join(stops)})"
 
+    def _build_full_category_breakdown(self, base_queryset):
+        rows = list(
+            base_queryset.values("category__name")
+            .annotate(total=Coalesce(Sum("amount"), Decimal("0.00")))
+            .order_by("-total")
+        )
+
+        cleaned_rows = []
+        total_amount = Decimal("0.00")
+        for row in rows:
+            amount = row["total"] or Decimal("0.00")
+            if amount <= 0:
+                continue
+
+            name = row["category__name"] or "Sem categoria"
+            cleaned_rows.append(
+                {
+                    "name": name,
+                    "total": amount,
+                }
+            )
+            total_amount += amount
+
+        if total_amount <= 0:
+            return [], "conic-gradient(#2b2f3a 0 100%)", Decimal("0.00")
+
+        items = []
+        total_float = float(total_amount)
+        cursor = 0.0
+        stops = []
+
+        for idx, row in enumerate(cleaned_rows):
+            percent = (float(row["total"]) / total_float) * 100
+            color = self.category_palette[idx % len(self.category_palette)]
+            end = cursor + percent
+
+            items.append(
+                {
+                    "name": row["name"],
+                    "total": row["total"],
+                    "percent": percent,
+                    "percent_label": f"{percent:.2f}".replace(".", ","),
+                    "color": color,
+                    "icon_letter": row["name"].strip()[:1].upper() or "?",
+                }
+            )
+
+            stops.append(f"{color} {cursor:.2f}% {end:.2f}%")
+            cursor = end
+
+        if cursor < 100:
+            stops.append(f"#2b2f3a {cursor:.2f}% 100%")
+
+        return items, f"conic-gradient({', '.join(stops)})", total_amount
+
+    def _build_expense_trend(self, user, selected_month: date):
+        points = []
+        for offset in range(-5, 1):
+            month_date = self._shift_month(selected_month, offset)
+            total = (
+                Transaction.objects.filter(
+                    user=user,
+                    transaction_type=Transaction.TransactionType.EXPENSE,
+                    is_ignored=False,
+                    date__year=month_date.year,
+                    date__month=month_date.month,
+                ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+                or Decimal("0.00")
+            )
+            short_month = MONTH_NAMES_PT.get(month_date.month, "")[:3]
+            points.append(
+                {
+                    "label": f"{short_month}/{month_date.year % 100:02d}",
+                    "total": total,
+                    "is_current": offset == 0,
+                }
+            )
+
+        max_total = max((point["total"] for point in points), default=Decimal("0.00"))
+        denominator = max_total if max_total > 0 else Decimal("1.00")
+
+        for point in points:
+            if point["total"] <= 0:
+                point["height_percent"] = 6.0
+                continue
+            raw_height = float((point["total"] / denominator) * Decimal("100.00"))
+            point["height_percent"] = max(10.0, raw_height)
+
+        return points
+
     def get_dashboard_context(self):
         user = self.request.user
         today = timezone.localdate()
@@ -125,6 +215,7 @@ class DashboardContextMixin(LoginRequiredMixin):
 
         current_month_transactions = Transaction.objects.filter(
             user=user,
+            is_ignored=False,
             date__year=selected_month.year,
             date__month=selected_month.month,
         )
@@ -144,6 +235,7 @@ class DashboardContextMixin(LoginRequiredMixin):
         available_transactions = Transaction.objects.filter(
             user=user,
             is_cleared=True,
+            is_ignored=False,
             date__lte=today,
         )
 
@@ -156,7 +248,7 @@ class DashboardContextMixin(LoginRequiredMixin):
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
         latest_transactions = (
-            Transaction.objects.filter(user=user)
+            Transaction.objects.filter(user=user, is_ignored=False)
             .select_related("account", "category", "destination_account")
             .order_by("-date", "-created_at")[:6]
         )
@@ -167,6 +259,7 @@ class DashboardContextMixin(LoginRequiredMixin):
                 user=user,
                 transaction_type=Transaction.TransactionType.EXPENSE,
                 is_cleared=False,
+                is_ignored=False,
                 date__lte=due_window_end,
             )
             .select_related("account", "category")
@@ -227,6 +320,7 @@ class DashboardContextMixin(LoginRequiredMixin):
             "category_empty": category_empty,
             "latest_transactions": latest_transactions,
             "selected_month_label": selected_month_label,
+            "selected_month_value": f"{selected_month.year:04d}-{selected_month.month:02d}",
             "prev_month_query": prev_month_query,
             "next_month_query": next_month_query,
             "today": today,
@@ -251,6 +345,9 @@ class DashboardHomeView(DashboardContextMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(self.get_dashboard_context())
+        context["show_post_login_loader"] = bool(
+            self.request.session.pop("show_post_login_loader", False)
+        )
         return context
 
 
@@ -269,4 +366,51 @@ class DashboardLatestPartialView(DashboardContextMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(self.get_dashboard_context())
+        return context
+
+
+class DashboardChartsView(DashboardContextMixin, TemplateView):
+    template_name = "dashboard/charts.html"
+    ALLOWED_CHART_MODES = {"donut", "trend", "list"}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(self.get_dashboard_context())
+
+        chart_mode = (self.request.GET.get("mode") or "list").strip().lower()
+        if chart_mode not in self.ALLOWED_CHART_MODES:
+            chart_mode = "list"
+
+        selected_month = self._get_selected_month()
+        monthly_expense_queryset = Transaction.objects.filter(
+            user=self.request.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            is_ignored=False,
+            date__year=selected_month.year,
+            date__month=selected_month.month,
+        )
+
+        charts_items, charts_donut_style, charts_total = self._build_full_category_breakdown(
+            monthly_expense_queryset
+        )
+
+        ranking_scope_label = context.get("selected_month_label", "Mes atual")
+        ranking_scope_note = ""
+
+        for idx, item in enumerate(charts_items, start=1):
+            item["rank"] = idx
+
+        trend_points = self._build_expense_trend(self.request.user, selected_month)
+
+        context.update(
+            {
+                "charts_items": charts_items,
+                "charts_donut_style": charts_donut_style,
+                "charts_total": charts_total,
+                "ranking_scope_label": ranking_scope_label,
+                "ranking_scope_note": ranking_scope_note,
+                "trend_points": trend_points,
+                "selected_chart_mode": chart_mode,
+            }
+        )
         return context

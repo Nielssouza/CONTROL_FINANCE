@@ -1,15 +1,30 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}Entrar | Control{% endblock %}
 
 {% block content %}
-<section class="app-page mx-auto mt-6 max-w-md space-y-5">
+<div id="login-loader-overlay" class="login-loader-overlay" role="status" aria-live="polite" aria-label="Carregando tela de login">
+    <div class="login-loader-card">
+        <div class="login-loader-orb" aria-hidden="true"></div>
+        <p class="login-loader-title">Control</p>
+        <p class="login-loader-step" id="login-loader-step">Iniciando sessao segura...</p>
+        <div class="login-loader-progress" aria-hidden="true">
+            <span id="login-loader-bar"></span>
+        </div>
+        <div class="login-loader-meta">
+            <span id="login-loader-percent">0%</span>
+            <button type="button" class="login-loader-skip" id="login-loader-skip">Pular</button>
+        </div>
+    </div>
+</div>
+
+<section class="app-page mx-auto mt-6 max-w-md space-y-5" id="login-page-content">
     <div>
         <h1 class="app-title">Entrar</h1>
         <p class="app-subtitle">Acesse sua carteira financeira.</p>
     </div>
 
-    <form method="post" class="card space-y-4">
+    <form method="post" class="card space-y-4" id="login-form">
         {% include "partials/form_fields.html" %}
         <button type="submit" class="app-btn-primary w-full">
             Entrar
@@ -23,4 +38,88 @@
     </p>
     {% endif %}
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const overlay = document.getElementById("login-loader-overlay");
+        const progressBar = document.getElementById("login-loader-bar");
+        const progressText = document.getElementById("login-loader-percent");
+        const stepText = document.getElementById("login-loader-step");
+        const skipButton = document.getElementById("login-loader-skip");
+
+        if (!overlay || !progressBar || !progressText || !stepText) {
+            return;
+        }
+
+        const steps = [
+            "Iniciando sessao segura...",
+            "Preparando formulario...",
+            "Validando ambiente...",
+            "Pronto para entrar.",
+        ];
+
+        const seenKey = "control_login_loader_seen_at";
+        const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        let shortMode = false;
+        try {
+            const lastSeen = Number.parseInt(window.localStorage.getItem(seenKey) || "0", 10);
+            shortMode = Number.isFinite(lastSeen) && (Date.now() - lastSeen) < (20 * 60 * 1000);
+        } catch {}
+
+        const duration = reduceMotion ? 280 : (shortMode ? 520 : 1650);
+        let finished = false;
+
+        const finish = () => {
+            if (finished) {
+                return;
+            }
+            finished = true;
+            overlay.classList.add("is-exiting");
+            window.setTimeout(() => {
+                overlay.remove();
+                const usernameInput = document.querySelector('input[name="username"]');
+                if (usernameInput instanceof HTMLElement) {
+                    usernameInput.focus();
+                }
+            }, 260);
+
+            try {
+                window.localStorage.setItem(seenKey, String(Date.now()));
+            } catch {}
+        };
+
+        if (skipButton) {
+            skipButton.addEventListener("click", finish);
+        }
+
+        const startAt = performance.now();
+        const tick = (now) => {
+            if (finished) {
+                return;
+            }
+
+            const elapsed = now - startAt;
+            const ratio = Math.min(1, elapsed / duration);
+            const percent = Math.round(ratio * 100);
+
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `${percent}%`;
+
+            const stepIndex = Math.min(steps.length - 1, Math.floor(ratio * steps.length));
+            stepText.textContent = steps[stepIndex];
+
+            if (ratio >= 1) {
+                finish();
+                return;
+            }
+
+            window.requestAnimationFrame(tick);
+        };
+
+        window.requestAnimationFrame(tick);
+    })();
+</script>
 {% endblock %}

@@ -6,6 +6,8 @@ from transactions.views import (
     StatementView,
     TransactionCreateView,
     TransactionDeleteView,
+    TransactionToggleClearedView,
+    TransactionToggleIgnoredView,
     TransactionUpdateView,
 )
 
@@ -18,4 +20,6 @@ urlpatterns = [
     path("quick-add/", QuickTransactionCreateView.as_view(), name="quick-add"),
     path("<int:pk>/edit/", TransactionUpdateView.as_view(), name="update"),
     path("<int:pk>/delete/", TransactionDeleteView.as_view(), name="delete"),
+    path("<int:pk>/toggle-cleared/", TransactionToggleClearedView.as_view(), name="toggle-cleared"),
+    path("<int:pk>/toggle-ignored/", TransactionToggleIgnoredView.as_view(), name="toggle-ignored"),
 ]
