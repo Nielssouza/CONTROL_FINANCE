@@ -4,6 +4,8 @@ import os
 import sys
 from pathlib import Path
 
+import dj_database_url
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -21,19 +23,30 @@ def env_list(name, default=""):
 
 TESTING = "test" in sys.argv
 RUNSERVER = "runserver" in sys.argv
+HEROKU_DYNO = bool(os.getenv("DYNO"))
+
 _debug_env = os.getenv("DJANGO_DEBUG")
 if _debug_env is None:
     DEBUG = RUNSERVER
 else:
     DEBUG = env_bool("DJANGO_DEBUG", default=False)
+
 SECRET_KEY = os.getenv(
     "DJANGO_SECRET_KEY",
     "control-prod-default-key-change-in-env-2026-02-13-9f2c7b6e4d1a",
 )
 
 _allowed_hosts_default = "127.0.0.1,localhost"
+if HEROKU_DYNO:
+    _allowed_hosts_default += ",.herokuapp.com"
+
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", _allowed_hosts_default)
+if HEROKU_DYNO and ".herokuapp.com" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".herokuapp.com")
+
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
+if HEROKU_DYNO and not any("herokuapp.com" in origin for origin in CSRF_TRUSTED_ORIGINS):
+    CSRF_TRUSTED_ORIGINS.append("https://*.herokuapp.com")
 
 PUBLIC_SIGNUP_ENABLED = env_bool("PUBLIC_SIGNUP_ENABLED", default=False)
 
@@ -55,6 +68,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -86,17 +100,27 @@ WSGI_APPLICATION = "finance_control.wsgi.application"
 
 
 use_sqlite = env_bool("USE_SQLITE", default=False)
-postgres_hint_enabled = bool(os.getenv("POSTGRES_DB") or os.getenv("POSTGRES_HOST"))
+database_url = os.getenv("DATABASE_URL", "").strip()
+postgres_hint_enabled = bool(database_url or os.getenv("POSTGRES_DB") or os.getenv("POSTGRES_HOST"))
 use_postgres = env_bool("USE_POSTGRES", default=postgres_hint_enabled)
 
-if use_sqlite or not use_postgres:
+if use_sqlite:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
-else:
+elif database_url:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            database_url,
+            conn_max_age=int(os.getenv("DATABASE_CONN_MAX_AGE", "600")),
+            ssl_require=env_bool("DATABASE_SSL_REQUIRE", default=HEROKU_DYNO),
+        )
+    }
+    DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
+elif use_postgres:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -108,6 +132,13 @@ else:
             "OPTIONS": {
                 "connect_timeout": 5,
             },
+        }
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
         }
     }
 
@@ -140,6 +171,19 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if not DEBUG
+            else "django.contrib.staticfiles.storage.StaticFilesStorage"
+        )
+    },
+}
 
 
 LOGIN_URL = "users:login"
@@ -174,6 +218,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = env_bool(
 )
 SECURE_REFERRER_POLICY = os.getenv("DJANGO_SECURE_REFERRER_POLICY", "same-origin")
 X_FRAME_OPTIONS = os.getenv("DJANGO_X_FRAME_OPTIONS", "DENY")
+
+if HEROKU_DYNO and not os.getenv("DJANGO_SECURE_PROXY_SSL_HEADER"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 _proxy_ssl_header = os.getenv("DJANGO_SECURE_PROXY_SSL_HEADER", "")
 if _proxy_ssl_header:
