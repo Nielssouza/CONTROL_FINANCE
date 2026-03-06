@@ -18,7 +18,7 @@
         <span>Principal</span>
     </a>
 
-    <a href="{% url 'transactions:statement' %}" class="txn-tab-link txn-tab-active">
+    <a href="{% url 'transactions:statement' %}" class="txn-tab-link txn-tab-active" aria-current="page">
         <span class="txn-tab-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14"/><path d="M5 12h14"/><path d="M5 17h14"/></svg>
         </span>
@@ -113,6 +113,7 @@
     </div>
 </section>
 {% endblock %}
+
 
 
 

@@ -1173,10 +1173,14 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 0.22rem;
+    border-radius: 1rem;
+    border: 1px solid transparent;
+    padding: 0.42rem 0.42rem;
     color: rgba(226, 232, 240, 0.86);
     font-size: 0.68rem;
     font-weight: 600;
     text-decoration: none;
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .txn-tab-icon {
@@ -1192,8 +1196,12 @@ body {
     width: 1.3rem;
 }
 
-.txn-tab-active {
+.txn-tab-active,
+.txn-tab-link[aria-current="page"] {
     color: #a855f7;
+    background: rgba(100, 116, 139, 0.34);
+    border-color: rgba(168, 85, 247, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.22), 0 10px 16px -14px rgba(124, 58, 237, 0.95);
 }
 
 .txn-center-fab {
@@ -1226,9 +1234,25 @@ body {
     .nav-item,
     .txn-tab-link,
     .dash-tab-link {
-        font-size: 0.62rem;
+        min-width: 4.1rem;
+        font-size: 0.61rem;
+    }
+
+    .app-center-fab,
+    .txn-center-fab,
+    .dash-center-fab {
+        height: 3.85rem;
+        width: 3.85rem;
+    }
+
+    .app-center-fab-icon,
+    .txn-center-fab-icon,
+    .dash-center-fab-icon {
+        width: 1.85rem;
+        height: 1.85rem;
     }
 }
+
 @media (max-width: 390px) {
     .app-user-chip {
         display: none;
@@ -1691,17 +1715,22 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 0.2rem;
-    border-radius: 9999px;
-    padding: 0.42rem 0.35rem;
+    border-radius: 1rem;
+    border: 1px solid transparent;
+    padding: 0.42rem 0.42rem;
     color: rgba(226, 232, 240, 0.86);
     text-decoration: none;
     font-size: 0.66rem;
     font-weight: 500;
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.dash-tab-active {
-    background: rgba(100, 116, 139, 0.35);
+.dash-tab-active,
+.dash-tab-link[aria-current="page"] {
+    background: rgba(100, 116, 139, 0.34);
+    border-color: rgba(168, 85, 247, 0.45);
     color: #a855f7;
+    box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.22), 0 10px 16px -14px rgba(124, 58, 237, 0.95);
 }
 
 .dash-tab-icon {
@@ -2593,6 +2622,80 @@ body {
     font-weight: 700;
 }
 
+.shopping-item-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+}
+
+.shopping-quick-form {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.shopping-quick-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42rem;
+    min-height: 2.6rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(71, 85, 105, 0.5);
+    background: rgba(15, 23, 42, 0.55);
+    color: #cbd5e1;
+    padding: 0.28rem 0.58rem 0.28rem 0.32rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.shopping-quick-toggle-box {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.62rem;
+    border: 2px solid rgba(148, 163, 184, 0.55);
+    background: rgba(30, 41, 59, 0.65);
+    color: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.shopping-quick-toggle-box svg {
+    width: 1rem;
+    height: 1rem;
+    opacity: 0;
+    transform: scale(0.72);
+    transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.shopping-quick-toggle-text {
+    letter-spacing: 0.01em;
+}
+
+.shopping-quick-toggle.is-checked {
+    border-color: rgba(34, 197, 94, 0.45);
+    background: rgba(20, 83, 45, 0.28);
+}
+
+.shopping-quick-toggle.is-checked .shopping-quick-toggle-box {
+    border-color: rgba(34, 197, 94, 0.9);
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+}
+
+.shopping-quick-toggle.is-checked .shopping-quick-toggle-box svg {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.shopping-quick-toggle.is-checked .shopping-quick-toggle-text {
+    color: #86efac;
+}
+
+.shopping-quick-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(134, 239, 172, 0.28);
+}
+
 .shopping-item-title-done {
     color: rgba(203, 213, 225, 0.74);
     text-decoration: line-through;
@@ -2633,4 +2736,7 @@ body {
         grid-column: 1 / -1;
     }
 }
+
+
+
 

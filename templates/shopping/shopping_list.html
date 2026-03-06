@@ -11,7 +11,7 @@
         <div>
             <h1 class="app-title">Lista de compras</h1>
             <p class="app-subtitle">Planeje itens e marque conforme comprar.</p>
-            <p class="app-touch-hint">Pressione e segure um card para ver as acoes.</p>
+            <p class="app-touch-hint">Toque no checkbox para baixar. Pressione e segure o card para editar/excluir.</p>
         </div>
         <a href="{% url 'shopping:create' %}" class="app-top-action">Novo item</a>
     </div>
@@ -37,16 +37,31 @@
         <div class="space-y-3">
             {% for item in items %}
                 <article class="card app-action-card shopping-item-card" data-press-actions>
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <p class="app-item-title{% if item.is_purchased %} shopping-item-title-done{% endif %}">{{ item.title }}</p>
-                            <p class="app-item-meta">Qtd: {{ item.quantity }}{% if item.unit_price %} | Unitario: {{ item.unit_price|brl }}{% endif %}</p>
+                    <div class="shopping-item-head">
+                        <form method="post" action="{% url 'shopping:toggle-purchased' item.pk %}" class="shopping-quick-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="shopping-quick-toggle {% if item.is_purchased %}is-checked{% endif %}" aria-label="{% if item.is_purchased %}Marcar pendente{% else %}Marcar comprado{% endif %}">
+                                <span class="shopping-quick-toggle-box" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M5 12.5l4.2 4.2L19 7.8"></path>
+                                    </svg>
+                                </span>
+                                <span class="shopping-quick-toggle-text">{% if item.is_purchased %}Comprado{% else %}Baixar{% endif %}</span>
+                            </button>
+                        </form>
+
+                        <div class="flex min-w-0 flex-1 items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="app-item-title{% if item.is_purchased %} shopping-item-title-done{% endif %}">{{ item.title }}</p>
+                                <p class="app-item-meta">Qtd: {{ item.quantity }}{% if item.unit_price %} | Unitario: {{ item.unit_price|brl }}{% endif %}</p>
+                            </div>
+                            {% if item.is_purchased %}
+                                <span class="badge badge-income">Comprado</span>
+                            {% else %}
+                                <span class="badge badge-expense">Pendente</span>
+                            {% endif %}
                         </div>
-                        {% if item.is_purchased %}
-                            <span class="badge badge-income">Comprado</span>
-                        {% else %}
-                            <span class="badge badge-expense">Pendente</span>
-                        {% endif %}
                     </div>
 
                     {% if item.notes %}
@@ -56,13 +71,6 @@
                     <p class="app-item-value mt-3">Estimado: {{ item.estimated_total|brl }}</p>
 
                     <div class="app-inline-actions mt-3">
-                        <form method="post" action="{% url 'shopping:toggle-purchased' item.pk %}" class="shopping-inline-form">
-                            {% csrf_token %}
-                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                            <button type="submit" class="shopping-link-toggle">
-                                {% if item.is_purchased %}Marcar pendente{% else %}Marcar comprado{% endif %}
-                            </button>
-                        </form>
                         <a href="{% url 'shopping:update' item.pk %}" class="app-link-edit">Editar</a>
                         <a href="{% url 'shopping:delete' item.pk %}" class="app-link-danger">Excluir</a>
                     </div>
@@ -74,4 +82,3 @@
     {% endif %}
 </section>
 {% endblock %}
-
