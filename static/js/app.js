@@ -232,6 +232,78 @@
         applyViewMode(getStoredViewMode());
     };
 
+
+    const initSwipeNav = (root = document) => {
+        const navs = root.querySelectorAll("[data-swipe-nav]");
+        if (!navs.length) {
+            return;
+        }
+
+        navs.forEach((nav) => {
+            if (!(nav instanceof HTMLElement) || nav.dataset.swipeReady === "1") {
+                return;
+            }
+
+            nav.dataset.swipeReady = "1";
+            let dragging = false;
+            let startX = 0;
+            let startLeft = 0;
+            let moved = false;
+
+            const releaseDrag = () => {
+                if (!dragging) {
+                    return;
+                }
+                dragging = false;
+                nav.classList.remove("is-dragging");
+                window.setTimeout(() => {
+                    moved = false;
+                }, 0);
+            };
+
+            nav.addEventListener("pointerdown", (event) => {
+                if (event.pointerType !== "mouse" || event.button !== 0) {
+                    return;
+                }
+
+                if (event.target.closest("a,button,input,select,textarea,label")) {
+                    return;
+                }
+
+                dragging = true;
+                startX = event.clientX;
+                startLeft = nav.scrollLeft;
+                moved = false;
+                nav.classList.add("is-dragging");
+            });
+
+            nav.addEventListener("pointermove", (event) => {
+                if (!dragging) {
+                    return;
+                }
+
+                const deltaX = event.clientX - startX;
+                if (Math.abs(deltaX) > 4) {
+                    moved = true;
+                    nav.scrollLeft = startLeft - deltaX;
+                }
+            });
+
+            nav.addEventListener("pointerup", releaseDrag);
+            nav.addEventListener("pointercancel", releaseDrag);
+            nav.addEventListener("pointerleave", releaseDrag);
+
+            nav.addEventListener("click", (event) => {
+                if (!moved) {
+                    return;
+                }
+                if (event.target.closest("a,button")) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }, true);
+        });
+    };
     const closeTransactionActionMenus = (exceptMenu = null) => {
         document.querySelectorAll("details[data-txn-actions][open]").forEach((menu) => {
             if (menu !== exceptMenu) {
@@ -356,6 +428,7 @@
             initPressActions(event.detail.target);
             initTransactionActionMenus(event.detail.target);
             initViewModeToggles(event.detail.target);
+            initSwipeNav(event.detail.target);
         }
 
         if (
@@ -447,6 +520,7 @@
     initPressActions(document);
     initTransactionActionMenus(document);
     initViewModeToggles(document);
+    initSwipeNav(document);
     applyViewMode(getStoredViewMode());
 })();
 

@@ -15,7 +15,7 @@
     {% if not app_debug %}
     <link rel="manifest" href="{% url 'manifest' %}">
     {% endif %}
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260306c">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260306e">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -81,7 +81,7 @@
     {% block bottom_navigation %}
     {% if user.is_authenticated %}
         {% with current=request.path %}
-            <nav class="txn-bottom-nav">
+            <nav class="txn-bottom-nav" data-swipe-nav>
                 <a href="{% url 'dashboard:home' %}" class="txn-tab-link {% if current == '/' %}txn-tab-active{% endif %}">
                     <span class="txn-tab-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
@@ -122,6 +122,13 @@
                     </span>
                     <span>Categorias</span>
                 </a>
+
+                <a href="{% url 'shopping:list' %}" class="txn-tab-link {% if current|slice:':10' == '/shopping/' %}txn-tab-active{% endif %}">
+                    <span class="txn-tab-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h2l2.2 10h10.8l2-7H8.2"/><circle cx="10" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/></svg>
+                    </span>
+                    <span>Compras</span>
+                </a>
             </nav>
         {% endwith %}
     {% endif %}
@@ -133,7 +140,7 @@
         </div>
     </div>
 
-    <script src="{% static 'js/app.js' %}?v=20260306c"></script>
+    <script src="{% static 'js/app.js' %}?v=20260306e"></script>
 <script>
     (function () {
         if (!("serviceWorker" in navigator)) {
@@ -174,6 +181,8 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+
+
 
 
 

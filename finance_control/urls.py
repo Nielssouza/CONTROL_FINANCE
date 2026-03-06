@@ -1,4 +1,4 @@
-﻿from django.conf import settings
+from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
@@ -15,5 +15,6 @@ urlpatterns = [
     path("categories/", include("categories.urls")),
     path("transactions/", include("transactions.urls")),
     path("goals/", include("goals.urls")),
+    path("shopping/", include("shopping.urls")),
     path("", include("dashboard.urls")),
 ]

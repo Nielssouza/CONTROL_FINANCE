@@ -10,7 +10,7 @@
 
 {% block bottom_navigation %}
 {% if user.is_authenticated %}
-<nav class="dash-bottom-nav">
+<nav class="dash-bottom-nav" data-swipe-nav>
     <a href="{% url 'dashboard:home' %}" class="dash-tab-link dash-tab-active" aria-current="page">
         <span class="dash-tab-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -64,6 +64,17 @@
             </svg>
         </span>
         <span>Categorias</span>
+    </a>
+
+    <a href="{% url 'shopping:list' %}" class="dash-tab-link">
+        <span class="dash-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M3 5h2l2.2 10h10.8l2-7H8.2"></path>
+                <circle cx="10" cy="19" r="1.6"></circle>
+                <circle cx="17" cy="19" r="1.6"></circle>
+            </svg>
+        </span>
+        <span>Compras</span>
     </a>
 </nav>
 {% endif %}

@@ -10,7 +10,7 @@
 
 {% block bottom_navigation %}
 {% if user.is_authenticated %}
-<nav class="txn-bottom-nav">
+<nav class="txn-bottom-nav" data-swipe-nav>
     <a href="{% url 'dashboard:home' %}" class="txn-tab-link">
         <span class="txn-tab-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
@@ -50,6 +50,13 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
         </span>
         <span>Categorias</span>
+    </a>
+
+    <a href="{% url 'shopping:list' %}" class="txn-tab-link">
+        <span class="txn-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h2l2.2 10h10.8l2-7H8.2"/><circle cx="10" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/></svg>
+        </span>
+        <span>Compras</span>
     </a>
 </nav>
 {% endif %}
