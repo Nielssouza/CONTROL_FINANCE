@@ -501,7 +501,7 @@ class TransactionScopeAndMonthLockTests(TestCase):
         self.assertTrue(self.feb.is_ignored)
         self.assertFalse(self.feb.is_cleared)
 
-    def test_monthly_balance_uses_only_cleared_transactions(self):
+    def test_monthly_balance_ignores_cleared_flag(self):
         expense_category = Category.objects.create(
             user=self.user,
             name="Internet",
@@ -519,15 +519,15 @@ class TransactionScopeAndMonthLockTests(TestCase):
             recurrence_type=Transaction.RecurrenceType.ONCE,
         )
 
-        self.feb.is_cleared = True
-        self.feb.save(update_fields=["is_cleared"])
-
         before_response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
         self.assertEqual(before_response.status_code, 200)
-        self.assertEqual(before_response.context["monthly_balance"], Decimal("7000.00"))
+        self.assertEqual(before_response.context["monthly_balance"], Decimal("6500.00"))
 
         expense.is_cleared = True
         expense.save(update_fields=["is_cleared"])
+
+        self.feb.is_cleared = True
+        self.feb.save(update_fields=["is_cleared"])
 
         after_response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
         self.assertEqual(after_response.status_code, 200)

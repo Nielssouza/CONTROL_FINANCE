@@ -388,7 +388,6 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
         monthly_queryset = Transaction.objects.filter(
             user=user,
             is_ignored=False,
-            is_cleared=True,
             date__year=selected_month.year,
             date__month=selected_month.month,
         )
