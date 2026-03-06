@@ -15,7 +15,7 @@
     {% if not app_debug %}
     <link rel="manifest" href="{% url 'manifest' %}">
     {% endif %}
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260213n">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260306c">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -36,6 +36,12 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-app text-slate-100 antialiased {% block body_class %}{% endblock %}">
+    <div id="app-open-loader" class="app-open-loader-overlay" aria-hidden="true">
+        <div class="app-open-loader-mark">
+            <span class="app-open-loader-ring"></span>
+            <span class="app-open-loader-label">Control</span>
+        </div>
+    </div>
     <div class="mx-auto flex min-h-screen w-full flex-col app-shell-frame {% block shell_class %}app-shell{% endblock %}">
         {% block page_header %}
         <header class="app-header">
@@ -127,7 +133,7 @@
         </div>
     </div>
 
-    <script src="{% static 'js/app.js' %}?v=20260213n"></script>
+    <script src="{% static 'js/app.js' %}?v=20260306c"></script>
 <script>
     (function () {
         if (!("serviceWorker" in navigator)) {
@@ -168,6 +174,10 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+
+
+
+
 
 
 

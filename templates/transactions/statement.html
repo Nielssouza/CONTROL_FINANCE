@@ -73,19 +73,14 @@
         {% endif %}
     </div>
 
-    <article class="txn-balance-card">
-        <div class="txn-balance-grid">
-            <div class="txn-balance-item">
-                <span class="txn-balance-label">Saldo atual</span>
-                <strong class="txn-balance-value{% if current_balance < 0 %} txn-balance-value-negative{% endif %}">{{ current_balance|brl }}</strong>
-            </div>
-            <div class="txn-balance-divider"></div>
-            <div class="txn-balance-item">
-                <span class="txn-balance-label">Balanco mensal</span>
-                <strong class="txn-balance-value{% if monthly_balance < 0 %} txn-balance-value-negative{% endif %}">{{ monthly_balance|brl }}</strong>
-            </div>
-        </div>
-    </article>
+    <div
+        id="statement-balance"
+        hx-get="{% url 'transactions:statement-summary-partial' %}{% if querystring %}?{{ querystring }}{% endif %}"
+        hx-trigger="transactionAdded from:body, transactionUpdated from:body"
+        hx-swap="innerHTML"
+    >
+        {% include "transactions/partials/statement_balance.html" %}
+    </div>
 
     <form method="get" class="txn-search-form">
         <input type="hidden" name="month" value="{{ selected_month_value }}">
@@ -104,7 +99,7 @@
     <div
         id="statement-list"
         hx-get="{% url 'transactions:statement-partial' %}{% if querystring %}?{{ querystring }}{% endif %}"
-        hx-trigger="transactionAdded from:body"
+        hx-trigger="transactionAdded from:body, transactionUpdated from:body"
         hx-swap="innerHTML"
     >
         {% include "transactions/partials/statement_list.html" %}

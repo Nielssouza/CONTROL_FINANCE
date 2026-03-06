@@ -71,6 +71,62 @@ class DashboardChartsMonthScopeTests(TestCase):
         self.assertIn("mode=trend", response.context["next_month_query"])
         self.assertContains(response, 'setMode("trend", false);')
 
+
+    def test_home_total_balance_ignores_pending_expense(self):
+        income_category = Category.objects.create(
+            user=self.user,
+            name="Salario2",
+            category_type=Category.CategoryType.INCOME,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.INCOME,
+            amount=Decimal("8000.00"),
+            date=date(2026, 3, 5),
+            account=self.account,
+            category=income_category,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+            is_cleared=True,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("1000.00"),
+            date=date(2026, 3, 13),
+            account=self.account,
+            category=self.category,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+            is_cleared=False,
+        )
+
+        response = self.client.get(reverse("dashboard:home"), {"month": "2026-03"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_balance"], Decimal("8000.00"))
+
+    def test_home_total_balance_respects_selected_month_cutoff(self):
+        income_category = Category.objects.create(
+            user=self.user,
+            name="Salario",
+            category_type=Category.CategoryType.INCOME,
+        )
+        march_income = Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.INCOME,
+            amount=Decimal("7000.00"),
+            date=date(2026, 3, 1),
+            account=self.account,
+            category=income_category,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+            is_cleared=True,
+        )
+
+        response = self.client.get(reverse("dashboard:home"), {"month": "2026-01"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_balance"], Decimal("0.00"))
+        self.assertTrue(Transaction.objects.filter(pk=march_income.pk, is_cleared=True).exists())
+
 class DashboardPostLoginLoaderTests(TestCase):
     def setUp(self):
         user_model = get_user_model()

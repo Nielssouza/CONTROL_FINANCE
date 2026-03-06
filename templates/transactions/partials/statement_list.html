@@ -39,9 +39,9 @@
                     {% if transaction.transaction_type == "expense" %}
                         <p class="txn-amount txn-amount-expense{% if transaction.is_cleared %} txn-amount-cleared{% endif %}{% if transaction.is_ignored %} txn-amount-ignored{% endif %}">{{ transaction.amount|brl }}</p>
                     {% elif transaction.transaction_type == "income" %}
-                        <p class="txn-amount txn-amount-income">{{ transaction.amount|brl }}</p>
+                        <p class="txn-amount txn-amount-income{% if transaction.is_cleared %} txn-amount-cleared{% endif %}{% if transaction.is_ignored %} txn-amount-ignored{% endif %}">{{ transaction.amount|brl }}</p>
                     {% else %}
-                        <p class="txn-amount txn-amount-transfer">{{ transaction.amount|brl }}</p>
+                        <p class="txn-amount txn-amount-transfer{% if transaction.is_ignored %} txn-amount-ignored{% endif %}">{{ transaction.amount|brl }}</p>
                     {% endif %}
 
                     <details class="txn-actions-dropdown" data-txn-actions>
@@ -54,7 +54,7 @@
                         </summary>
 
                         <div class="txn-actions-menu">
-                            <form method="post" action="{% url 'transactions:toggle-cleared' transaction.pk %}" class="txn-actions-form">
+                            <form method="post" action="{% url 'transactions:toggle-cleared' transaction.pk %}" class="txn-actions-form" hx-post="{% url 'transactions:toggle-cleared' transaction.pk %}" hx-swap="none">
                                 {% csrf_token %}
                                 <input type="hidden" name="next" value="{{ statement_return_url|default:request.get_full_path }}">
                                 <button type="submit" class="txn-menu-item txn-menu-item-clear{% if transaction.is_cleared %} txn-menu-item-clear-active{% endif %}">
@@ -62,18 +62,16 @@
                                 </button>
                             </form>
 
-                            {% if transaction.transaction_type == "expense" %}
-                                <form method="post" action="{% url 'transactions:toggle-ignored' transaction.pk %}" class="txn-actions-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="next" value="{{ statement_return_url|default:request.get_full_path }}">
-                                    <button type="submit" class="txn-menu-item txn-menu-item-ignore{% if transaction.is_ignored %} txn-menu-item-ignore-active{% endif %}">
-                                        {% if transaction.is_ignored %}Reativar{% else %}Ignorar{% endif %}
-                                    </button>
-                                </form>
-                            {% endif %}
+                            <form method="post" action="{% url 'transactions:toggle-ignored' transaction.pk %}" class="txn-actions-form" hx-post="{% url 'transactions:toggle-ignored' transaction.pk %}" hx-swap="none">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ statement_return_url|default:request.get_full_path }}">
+                                <button type="submit" class="txn-menu-item txn-menu-item-ignore{% if transaction.is_ignored %} txn-menu-item-ignore-active{% endif %}">
+                                    {% if transaction.is_ignored %}Reativar{% else %}Ignorar{% endif %}
+                                </button>
+                            </form>
 
                             <a href="{% url 'transactions:update' transaction.pk %}" class="txn-menu-item txn-menu-item-edit">Editar</a>
-                            <a href="{% url 'transactions:delete' transaction.pk %}" class="txn-menu-item txn-menu-item-delete">Excluir</a>
+                            <a href="{% url 'transactions:delete' transaction.pk %}?next={{ statement_return_url|default:request.get_full_path|urlencode }}" class="txn-menu-item txn-menu-item-delete">Excluir</a>
                         </div>
                     </details>
                 </div>
@@ -85,3 +83,5 @@
         Nenhuma transacao encontrada para os filtros selecionados.
     </article>
 {% endif %}
+
+

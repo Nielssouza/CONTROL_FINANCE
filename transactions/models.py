@@ -335,8 +335,6 @@ class Transaction(models.Model):
             self.recurrence_interval = 1
             self.recurrence_interval_unit = self.IntervalUnit.MONTH
 
-        if self.transaction_type != self.TransactionType.EXPENSE:
-            self.is_ignored = False
         if self.is_ignored:
             self.is_cleared = False
 

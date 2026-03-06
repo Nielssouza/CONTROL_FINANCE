@@ -1,6 +1,7 @@
 (() => {
     const backdrop = document.getElementById("modal-backdrop");
     const modalContent = document.getElementById("modal-content");
+    const openLoaderOverlay = document.getElementById("app-open-loader");
     const currencyFormatter = new Intl.NumberFormat("pt-BR", {
         style: "currency",
         currency: "BRL",
@@ -10,6 +11,31 @@
     const VIEW_MODE_MOBILE = "mobile";
     const VIEW_MODE_BROWSER = "browser";
 
+    const initOpenLoader = () => {
+        if (!(openLoaderOverlay instanceof HTMLElement)) {
+            return;
+        }
+
+        if (openLoaderOverlay.dataset.ready === "1") {
+            return;
+        }
+        openLoaderOverlay.dataset.ready = "1";
+
+        const closeOpenLoader = () => {
+            if (openLoaderOverlay.dataset.closed === "1") {
+                return;
+            }
+            openLoaderOverlay.dataset.closed = "1";
+            openLoaderOverlay.classList.add("is-exiting");
+            window.setTimeout(() => {
+                openLoaderOverlay.remove();
+            }, 300);
+        };
+
+        const OPEN_LOADER_VISIBLE_MS = 2000;
+        window.setTimeout(closeOpenLoader, OPEN_LOADER_VISIBLE_MS);
+        window.addEventListener("pageshow", closeOpenLoader, { once: true });
+    };
     const parseAmountToCents = (value) => {
         const raw = (value || "").toString();
         const digitsOnly = raw.replace(/\D/g, "");
@@ -216,6 +242,41 @@
 
     let txnMenuOutsideBound = false;
 
+    const getBottomNavHeight = () => {
+        const bottomNav = document.querySelector(".txn-bottom-nav, .dash-bottom-nav, .app-bottom-nav");
+        return bottomNav ? bottomNav.getBoundingClientRect().height : 0;
+    };
+
+    const positionTransactionActionMenu = (menu) => {
+        if (!(menu instanceof HTMLElement) || !menu.open) {
+            return;
+        }
+
+        const panel = menu.querySelector(".txn-actions-menu");
+        if (!(panel instanceof HTMLElement)) {
+            return;
+        }
+
+        menu.classList.remove("txn-actions-dropdown-up");
+
+        const triggerRect = menu.getBoundingClientRect();
+        const panelHeight = panel.offsetHeight || 220;
+        const bottomInset = getBottomNavHeight();
+        const viewportPadding = 10;
+
+        const spaceBelow = window.innerHeight - triggerRect.bottom - bottomInset - viewportPadding;
+        const spaceAbove = triggerRect.top - viewportPadding;
+        const shouldOpenUp = spaceBelow < panelHeight && spaceAbove > spaceBelow;
+
+        menu.classList.toggle("txn-actions-dropdown-up", shouldOpenUp);
+    };
+
+    const positionOpenTransactionMenus = () => {
+        document.querySelectorAll("details[data-txn-actions][open]").forEach((menu) => {
+            positionTransactionActionMenu(menu);
+        });
+    };
+
     const initTransactionActionMenus = (root = document) => {
         const menus = root.querySelectorAll("details[data-txn-actions]");
         if (!menus.length) {
@@ -229,6 +290,9 @@
                     closeTransactionActionMenus();
                 }
             });
+
+            window.addEventListener("resize", positionOpenTransactionMenus, { passive: true });
+            window.addEventListener("scroll", positionOpenTransactionMenus, { passive: true });
         }
 
         menus.forEach((menu) => {
@@ -240,7 +304,13 @@
             menu.addEventListener("toggle", () => {
                 if (menu.open) {
                     closeTransactionActionMenus(menu);
+                    window.requestAnimationFrame(() => {
+                        positionTransactionActionMenu(menu);
+                    });
+                    return;
                 }
+
+                menu.classList.remove("txn-actions-dropdown-up");
             });
         });
     };
@@ -266,7 +336,11 @@
         document.body.classList.remove("overflow-hidden");
     };
 
-    window.financeApp = { openModal, closeModal };
+    window.financeApp = {
+        openModal,
+        closeModal,
+        closeTxnMenus: () => closeTransactionActionMenus(),
+    };
 
     if (backdrop) {
         backdrop.addEventListener("click", (event) => {
@@ -316,7 +390,49 @@
         true
     );
 
+
+    const refreshStatementPanels = () => {
+        if (!window.htmx) {
+            return;
+        }
+
+        ["statement-balance", "statement-list"].forEach((elementId) => {
+            const panel = document.getElementById(elementId);
+            if (!(panel instanceof HTMLElement)) {
+                return;
+            }
+
+            const endpoint = panel.getAttribute("hx-get");
+            if (!endpoint) {
+                return;
+            }
+
+            window.htmx.ajax("GET", endpoint, {
+                target: `#${elementId}`,
+                swap: "innerHTML",
+            });
+        });
+    };
+
+    document.body.addEventListener("htmx:afterRequest", (event) => {
+        const detail = event.detail || {};
+        const requestPath = (detail.pathInfo && detail.pathInfo.requestPath) || "";
+        if (!/\/transactions\/\d+\/toggle-(cleared|ignored)\/?$/.test(requestPath)) {
+            return;
+        }
+
+        const xhr = detail.xhr;
+        const status = xhr ? xhr.status : 0;
+        if (status < 200 || status >= 400) {
+            return;
+        }
+
+        closeTransactionActionMenus();
+        refreshStatementPanels();
+    });
     document.body.addEventListener("closeModal", closeModal);
+    document.body.addEventListener("closeTxnMenus", () => closeTransactionActionMenus());
+    document.body.addEventListener("transactionUpdated", () => closeTransactionActionMenus());
 
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
@@ -326,9 +442,17 @@
         }
     });
 
+    initOpenLoader();
     initCurrencyMasks(document);
     initPressActions(document);
     initTransactionActionMenus(document);
     initViewModeToggles(document);
     applyViewMode(getStoredViewMode());
 })();
+
+
+
+
+
+
+

@@ -1,0 +1,14 @@
+{% load formatters %}
+<article class="txn-balance-card">
+    <div class="txn-balance-grid">
+        <div class="txn-balance-item">
+            <span class="txn-balance-label">Saldo atual</span>
+            <strong class="txn-balance-value{% if current_balance < 0 %} txn-balance-value-negative{% endif %}">{{ current_balance|brl }}</strong>
+        </div>
+        <div class="txn-balance-divider"></div>
+        <div class="txn-balance-item">
+            <span class="txn-balance-label">Balanco mensal</span>
+            <strong class="txn-balance-value{% if monthly_balance < 0 %} txn-balance-value-negative{% endif %}">{{ monthly_balance|brl }}</strong>
+        </div>
+    </div>
+</article>

@@ -232,19 +232,23 @@ class DashboardContextMixin(LoginRequiredMixin):
             total=Coalesce(Sum("initial_balance"), Decimal("0.00"))
         )["total"]
 
-        available_transactions = Transaction.objects.filter(
+        end_of_selected_month = self._shift_month(selected_month, 1) - timedelta(days=1)
+        balance_cutoff_date = end_of_selected_month
+
+        total_income = Transaction.objects.filter(
             user=user,
+            transaction_type=Transaction.TransactionType.INCOME,
             is_cleared=True,
             is_ignored=False,
-            date__lte=today,
-        )
-
-        total_income = available_transactions.filter(
-            transaction_type=Transaction.TransactionType.INCOME,
+            date__lte=balance_cutoff_date,
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
-        total_expense = available_transactions.filter(
+        total_expense = Transaction.objects.filter(
+            user=user,
             transaction_type=Transaction.TransactionType.EXPENSE,
+            is_cleared=True,
+            is_ignored=False,
+            date__lte=balance_cutoff_date,
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
         latest_transactions = (
@@ -414,3 +418,6 @@ class DashboardChartsView(DashboardContextMixin, TemplateView):
             }
         )
         return context
+
+
+

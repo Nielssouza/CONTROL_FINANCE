@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib import messages
@@ -99,6 +99,7 @@ class RecurrenceScopeMixin:
             recurrence_interval_unit=reference_transaction.recurrence_interval_unit,
             installment_count=reference_transaction.installment_count,
             is_cleared=False,
+            date__gte=reference_transaction.date,
         )
 
     def get_scope_queryset(self, reference_transaction, scope):
@@ -119,7 +120,6 @@ class RecurrenceScopeMixin:
             "destination_account": updated_transaction.destination_account,
             "category": updated_transaction.category,
             "description": updated_transaction.description,
-            "is_cleared": updated_transaction.is_cleared,
             "recurrence_type": updated_transaction.recurrence_type,
             "recurrence_interval": updated_transaction.recurrence_interval,
             "recurrence_interval_unit": updated_transaction.recurrence_interval_unit,
@@ -168,11 +168,27 @@ class TransactionUpdateView(
     template_name = "transactions/transaction_form.html"
     success_url = reverse_lazy("transactions:statement")
 
+    def _resolve_return_url(self):
+        next_url = (
+            self.request.POST.get("next")
+            or self.request.GET.get("next")
+            or ""
+        ).strip()
+        if next_url.startswith("/transactions/partial/"):
+            next_url = next_url.replace("/transactions/partial/", "/transactions/", 1)
+        if next_url.startswith("/"):
+            return next_url
+        return str(self.success_url)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["scope_options"] = self.get_scope_options()
         context["selected_scope"] = self.get_scope()
+        context["return_url"] = self._resolve_return_url()
         return context
+
+    def get_success_url(self):
+        return self._resolve_return_url()
 
     def form_valid(self, form):
         scope = self.get_scope()
@@ -207,11 +223,27 @@ class TransactionDeleteView(
     template_name = "transactions/transaction_confirm_delete.html"
     success_url = reverse_lazy("transactions:statement")
 
+    def _resolve_return_url(self):
+        next_url = (
+            self.request.POST.get("next")
+            or self.request.GET.get("next")
+            or ""
+        ).strip()
+        if next_url.startswith("/transactions/partial/"):
+            next_url = next_url.replace("/transactions/partial/", "/transactions/", 1)
+        if next_url.startswith("/"):
+            return next_url
+        return str(self.success_url)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["scope_options"] = self.get_scope_options()
         context["selected_scope"] = self.get_scope()
+        context["return_url"] = self._resolve_return_url()
         return context
+
+    def get_success_url(self):
+        return self._resolve_return_url()
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -324,31 +356,39 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
 
         return selected_label, prev_params.urlencode(), next_params.urlencode()
 
+    def get_balance_cutoff_date(self, selected_month):
+        next_month = self.shift_month(selected_month, 1)
+        end_of_selected_month = next_month - timedelta(days=1)
+        return end_of_selected_month
+
     def get_balances(self, form, selected_month):
         user = self.request.user
-        today = timezone.localdate()
+        balance_cutoff_date = self.get_balance_cutoff_date(selected_month)
 
         initial_total = Account.objects.filter(user=user, is_active=True).aggregate(
             total=Coalesce(Sum("initial_balance"), Decimal("0.00"))
         )["total"]
 
-        available_transactions = Transaction.objects.filter(
+        total_income = Transaction.objects.filter(
             user=user,
+            transaction_type=Transaction.TransactionType.INCOME,
             is_cleared=True,
             is_ignored=False,
-            date__lte=today,
-        )
-        total_income = available_transactions.filter(
-            transaction_type=Transaction.TransactionType.INCOME
+            date__lte=balance_cutoff_date,
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-        total_expense = available_transactions.filter(
-            transaction_type=Transaction.TransactionType.EXPENSE
+        total_expense = Transaction.objects.filter(
+            user=user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            is_cleared=True,
+            is_ignored=False,
+            date__lte=balance_cutoff_date,
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
         current_balance = initial_total + total_income - total_expense
 
         monthly_queryset = Transaction.objects.filter(
             user=user,
             is_ignored=False,
+            is_cleared=True,
             date__year=selected_month.year,
             date__month=selected_month.month,
         )
@@ -418,8 +458,20 @@ class StatementPartialView(StatementViewBase):
     template_name = "transactions/partials/statement_list.html"
 
 
+class StatementBalancePartialView(StatementViewBase):
+    template_name = "transactions/partials/statement_balance.html"
+
+
 class TransactionToggleClearedView(LoginRequiredMixin, View):
     success_url = reverse_lazy("transactions:statement")
+
+    def _resolve_next_url(self, request):
+        next_url = (request.POST.get("next") or "").strip()
+        if next_url.startswith("/transactions/partial/"):
+            next_url = next_url.replace("/transactions/partial/", "/transactions/", 1)
+        if not next_url.startswith("/"):
+            next_url = str(self.success_url)
+        return next_url
 
     def post(self, request, *args, **kwargs):
         tx = get_object_or_404(Transaction, pk=kwargs.get("pk"), user=request.user)
@@ -428,35 +480,41 @@ class TransactionToggleClearedView(LoginRequiredMixin, View):
             tx.is_ignored = False
         tx.save(update_fields=["is_cleared", "is_ignored", "updated_at"])
 
-        next_url = (request.POST.get("next") or "").strip()
-        if next_url.startswith("/transactions/partial/"):
-            next_url = next_url.replace("/transactions/partial/", "/transactions/", 1)
-        if not next_url.startswith("/"):
-            next_url = str(self.success_url)
+        next_url = self._resolve_next_url(request)
+        if request.headers.get("HX-Request") == "true":
+            response = HttpResponse(status=204)
+            response["HX-Redirect"] = next_url
+            return response
+
         return HttpResponseRedirect(next_url)
 
 
 class TransactionToggleIgnoredView(LoginRequiredMixin, View):
     success_url = reverse_lazy("transactions:statement")
 
-    def post(self, request, *args, **kwargs):
-        tx = get_object_or_404(Transaction, pk=kwargs.get("pk"), user=request.user)
-
-        if tx.transaction_type != Transaction.TransactionType.EXPENSE:
-            messages.error(request, "Somente despesas podem ser ignoradas.")
-        else:
-            tx.is_ignored = not tx.is_ignored
-            if tx.is_ignored:
-                tx.is_cleared = False
-            tx.save(update_fields=["is_ignored", "is_cleared", "updated_at"])
-
+    def _resolve_next_url(self, request):
         next_url = (request.POST.get("next") or "").strip()
         if next_url.startswith("/transactions/partial/"):
             next_url = next_url.replace("/transactions/partial/", "/transactions/", 1)
         if not next_url.startswith("/"):
             next_url = str(self.success_url)
-        return HttpResponseRedirect(next_url)
+        return next_url
 
+    def post(self, request, *args, **kwargs):
+        tx = get_object_or_404(Transaction, pk=kwargs.get("pk"), user=request.user)
+
+        tx.is_ignored = not tx.is_ignored
+        if tx.is_ignored:
+            tx.is_cleared = False
+        tx.save(update_fields=["is_ignored", "is_cleared", "updated_at"])
+
+        next_url = self._resolve_next_url(request)
+        if request.headers.get("HX-Request") == "true":
+            response = HttpResponse(status=204)
+            response["HX-Redirect"] = next_url
+            return response
+
+        return HttpResponseRedirect(next_url)
 
 class QuickTransactionCreateView(
     MonthLockMixin,
@@ -481,6 +539,16 @@ class QuickTransactionCreateView(
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
+
+
+
+
+
+
+
+
+
+
 
 
 

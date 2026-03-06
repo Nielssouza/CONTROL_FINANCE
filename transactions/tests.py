@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -91,6 +92,25 @@ class TransactionScopeAndMonthLockTests(TestCase):
         data.update(overrides)
         return data
 
+    def test_future_transaction_marked_as_cleared_is_kept_cleared(self):
+        future_tx = Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("300.00"),
+            date=date(2026, 4, 10),
+            account=self.account,
+            category=Category.objects.create(
+                user=self.user,
+                name="Conta futura",
+                category_type=Category.CategoryType.EXPENSE,
+            ),
+            description="Despesa futura",
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+            is_cleared=True,
+        )
+
+        future_tx.refresh_from_db()
+        self.assertTrue(future_tx.is_cleared)
     def test_update_scope_current_changes_only_selected_transaction(self):
         payload = self._build_edit_payload(amount="R$ 7.200,00", scope="current")
 
@@ -127,6 +147,47 @@ class TransactionScopeAndMonthLockTests(TestCase):
         self.assertEqual(self.jan.description, "Salarios")  # baixada nao muda
         self.assertEqual(self.feb.description, "Salario principal")
         self.assertEqual(self.mar.description, "Salario principal")
+
+
+    def test_update_scope_all_applies_only_forward_occurrences(self):
+        payload = self._build_edit_payload(
+            description="Somente futuro",
+            scope="all",
+        )
+
+        response = self.client.post(
+            reverse("transactions:update", args=[self.feb.pk]),
+            data=payload,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.jan.refresh_from_db()
+        self.feb.refresh_from_db()
+        self.mar.refresh_from_db()
+
+        self.assertEqual(self.jan.description, "Salarios")
+        self.assertEqual(self.feb.description, "Somente futuro")
+        self.assertEqual(self.mar.description, "Somente futuro")
+
+    def test_update_scope_all_does_not_propagate_cleared_flag(self):
+        payload = self._build_edit_payload(
+            description="Ajuste recorrencia",
+            scope="all",
+            is_cleared="on",
+        )
+
+        response = self.client.post(
+            reverse("transactions:update", args=[self.feb.pk]),
+            data=payload,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.feb.refresh_from_db()
+        self.mar.refresh_from_db()
+
+        self.assertTrue(self.feb.is_cleared)
+        self.assertFalse(self.mar.is_cleared)
+        self.assertEqual(self.mar.description, "Ajuste recorrencia")
 
     def test_update_closed_month_allows_change_without_password(self):
         self._close_month(2026, 2)
@@ -168,6 +229,20 @@ class TransactionScopeAndMonthLockTests(TestCase):
         self.assertTrue(Transaction.objects.filter(pk=self.jan.pk).exists())
         self.assertFalse(Transaction.objects.filter(pk=self.feb.pk).exists())
         self.assertTrue(Transaction.objects.filter(pk=self.mar.pk).exists())
+
+
+    def test_delete_preserves_month_in_redirect(self):
+        response = self.client.post(
+            reverse("transactions:delete", args=[self.feb.pk]),
+            data={
+                "scope": "current",
+                "unlock_password": "",
+                "next": "/transactions/?month=2026-02",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/transactions/?month=2026-02")
 
     def test_delete_scope_all_removes_all_pending_transactions_in_series(self):
         self.jan.is_cleared = True
@@ -350,7 +425,83 @@ class TransactionScopeAndMonthLockTests(TestCase):
         self.assertContains(feb_response, "Notebook (1/3)")
         self.assertContains(mar_response, "Notebook (2/3)")
 
-    def test_toggle_ignored_expense_excludes_from_monthly_balance(self):
+    def test_statement_current_balance_respects_selected_month_cutoff(self):
+        self.mar.is_cleared = True
+        self.mar.save(update_fields=["is_cleared"])
+
+        response = self.client.get(
+            reverse("transactions:statement"),
+            {"month": "2026-01"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["current_balance"], Decimal("0.00"))
+
+
+
+    def test_statement_current_balance_ignores_pending_expense(self):
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Conta pendente",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("500.00"),
+            date=date(2026, 3, 10),
+            account=self.account,
+            category=expense_category,
+            description="Pendente",
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+            is_cleared=False,
+        )
+
+        with patch("transactions.models.timezone.localdate", return_value=date(2026, 3, 31)):
+            self.mar.is_cleared = True
+            self.mar.save(update_fields=["is_cleared"])
+
+        with patch("transactions.views.timezone.localdate", return_value=date(2026, 3, 31)):
+            response = self.client.get(
+                reverse("transactions:statement"),
+                {"month": "2026-03"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["current_balance"], Decimal("7000.00"))
+
+    def test_statement_shows_ignore_action_for_income(self):
+        response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("transactions:toggle-ignored", args=[self.feb.pk]))
+        self.assertContains(response, "Ignorar")
+
+
+    def test_statement_marks_cleared_income_with_strike_class(self):
+        self.feb.is_cleared = True
+        self.feb.save(update_fields=["is_cleared"])
+
+        response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "txn-amount txn-amount-income txn-amount-cleared")
+
+    def test_toggle_ignored_income_is_allowed(self):
+        self.feb.is_cleared = True
+        self.feb.save(update_fields=["is_cleared"])
+
+        response = self.client.post(
+            reverse("transactions:toggle-ignored", args=[self.feb.pk]),
+            data={"next": "/transactions/?month=2026-02"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.feb.refresh_from_db()
+        self.assertTrue(self.feb.is_ignored)
+        self.assertFalse(self.feb.is_cleared)
+
+    def test_monthly_balance_uses_only_cleared_transactions(self):
         expense_category = Category.objects.create(
             user=self.user,
             name="Internet",
@@ -368,22 +519,58 @@ class TransactionScopeAndMonthLockTests(TestCase):
             recurrence_type=Transaction.RecurrenceType.ONCE,
         )
 
+        self.feb.is_cleared = True
+        self.feb.save(update_fields=["is_cleared"])
+
         before_response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
         self.assertEqual(before_response.status_code, 200)
-        self.assertEqual(before_response.context["monthly_balance"], Decimal("6500.00"))
+        self.assertEqual(before_response.context["monthly_balance"], Decimal("7000.00"))
 
-        toggle_response = self.client.post(
-            reverse("transactions:toggle-ignored", args=[expense.pk]),
-            data={"next": "/transactions/?month=2026-02"},
-        )
-        self.assertEqual(toggle_response.status_code, 302)
-
-        expense.refresh_from_db()
-        self.assertTrue(expense.is_ignored)
+        expense.is_cleared = True
+        expense.save(update_fields=["is_cleared"])
 
         after_response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
         self.assertEqual(after_response.status_code, 200)
-        self.assertEqual(after_response.context["monthly_balance"], Decimal("7000.00"))
+        self.assertEqual(after_response.context["monthly_balance"], Decimal("6500.00"))
+
+    def test_toggle_cleared_with_htmx_returns_redirect_header(self):
+        response = self.client.post(
+            reverse("transactions:toggle-cleared", args=[self.feb.pk]),
+            data={"next": "/transactions/?month=2026-02"},
+            HTTP_HX_REQUEST="true",
+        )
+
+        self.assertEqual(response.status_code, 204)
+        self.assertIn("HX-Redirect", response.headers)
+        self.assertEqual(response.headers["HX-Redirect"], "/transactions/?month=2026-02")
+
+    def test_toggle_ignored_with_htmx_returns_redirect_header(self):
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Streaming",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        expense = Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("99.00"),
+            date=date(2026, 2, 20),
+            account=self.account,
+            category=expense_category,
+            description="Servico",
+            is_cleared=False,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        response = self.client.post(
+            reverse("transactions:toggle-ignored", args=[expense.pk]),
+            data={"next": "/transactions/?month=2026-02"},
+            HTTP_HX_REQUEST="true",
+        )
+
+        self.assertEqual(response.status_code, 204)
+        self.assertIn("HX-Redirect", response.headers)
+        self.assertEqual(response.headers["HX-Redirect"], "/transactions/?month=2026-02")
 
     def test_toggle_cleared_removes_ignored_flag_and_sets_baixada(self):
         expense_category = Category.objects.create(
@@ -432,3 +619,9 @@ class TransactionScopeAndMonthLockTests(TestCase):
                 description="Extra",
             ).exists()
         )
+
+
+
+
+
+

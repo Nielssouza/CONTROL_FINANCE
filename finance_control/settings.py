@@ -1,4 +1,4 @@
-﻿"""Django settings for finance_control project."""
+"""Django settings for finance_control project."""
 
 import os
 import sys
@@ -229,4 +229,16 @@ if _proxy_ssl_header:
         SECURE_PROXY_SSL_HEADER = (_parts[0], _parts[1])
 
 
+
+LOCAL_DEVELOPMENT = not HEROKU_DYNO
+if LOCAL_DEVELOPMENT:
+    # Mantem desenvolvimento local em HTTP para evitar redirects 301/HTTPS no runserver.
+    SECURE_SSL_REDIRECT = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+

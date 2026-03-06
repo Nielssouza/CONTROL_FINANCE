@@ -205,6 +205,66 @@ body {
     color: #f8fafc;
 }
 
+.app-open-loader-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 68;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 20% -15%, rgba(88, 28, 135, 0.28), transparent 44%),
+        radial-gradient(circle at 80% -20%, rgba(45, 212, 191, 0.14), transparent 42%),
+        linear-gradient(180deg, rgba(13, 16, 24, 0.96) 0%, rgba(8, 10, 16, 0.96) 100%);
+    backdrop-filter: blur(4px);
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.app-open-loader-overlay.is-exiting {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.app-open-loader-mark {
+    display: grid;
+    place-items: center;
+    gap: 0.55rem;
+}
+
+.app-open-loader-ring {
+    width: 3.1rem;
+    height: 3.1rem;
+    border-radius: 9999px;
+    border: 2.5px solid rgba(148, 163, 184, 0.2);
+    border-top-color: #22c55e;
+    border-right-color: #a855f7;
+    animation: app-open-spin 0.75s linear infinite;
+}
+
+.app-open-loader-label {
+    color: rgba(226, 232, 240, 0.88);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+@keyframes app-open-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-open-loader-overlay {
+        transition: none;
+    }
+
+    .app-open-loader-ring {
+        animation: none;
+    }
+}
 .login-loader-overlay {
     position: fixed;
     inset: 0;
@@ -982,7 +1042,7 @@ body {
     position: absolute;
     top: calc(100% + 0.28rem);
     right: 0;
-    z-index: 20;
+    z-index: 60;
     min-width: 9.5rem;
     border-radius: 0.9rem;
     border: 1px solid rgba(71, 85, 105, 0.48);
@@ -991,6 +1051,14 @@ body {
     padding: 0.32rem;
     display: grid;
     gap: 0.24rem;
+    max-height: min(15.5rem, calc(100vh - 7.5rem));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.txn-actions-dropdown-up .txn-actions-menu {
+    top: auto;
+    bottom: calc(100% + 0.28rem);
 }
 
 .txn-actions-form {
@@ -2450,4 +2518,5 @@ body {
         font-size: 0.68rem;
     }
 }
+
 
