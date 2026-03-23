@@ -1,9 +1,53 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
+
+
+class ShoppingList(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="shopping_lists",
+    )
+    name = models.CharField("Lista", max_length=120)
+    list_date = models.DateField("Data da lista", default=timezone.localdate)
+    notes = models.CharField("Observacao", max_length=220, blank=True)
+    created_at = models.DateTimeField("Criada em", auto_now_add=True)
+    updated_at = models.DateTimeField("Atualizada em", auto_now=True)
+
+    class Meta:
+        ordering = ("-updated_at", "-created_at")
+        verbose_name = "Lista de compra"
+        verbose_name_plural = "Listas de compra"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("user", "name"),
+                name="unique_shopping_list_name_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def pending_count(self) -> int:
+        return sum(1 for item in self.items.all() if not item.is_purchased)
+
+    @property
+    def purchased_count(self) -> int:
+        return sum(1 for item in self.items.all() if item.is_purchased)
+
+    @property
+    def purchased_total(self) -> Decimal:
+        total = Decimal("0.00")
+        for item in self.items.all():
+            if item.is_purchased:
+                total += item.estimated_total
+        return total.quantize(Decimal("0.01"))
 
 
 class ShoppingItem(models.Model):
@@ -11,6 +55,12 @@ class ShoppingItem(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="shopping_items",
+    )
+    shopping_list = models.ForeignKey(
+        ShoppingList,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="Lista",
     )
     title = models.CharField("Item", max_length=140)
     quantity = models.PositiveIntegerField(
@@ -36,8 +86,14 @@ class ShoppingItem(models.Model):
         verbose_name = "Item de compra"
         verbose_name_plural = "Itens de compra"
         indexes = [
-            models.Index(fields=("user", "is_purchased", "updated_at")),
-            models.Index(fields=("user", "created_at")),
+            models.Index(
+                fields=("user", "shopping_list", "is_purchased", "updated_at"),
+                name="shop_item_user_list_idx",
+            ),
+            models.Index(
+                fields=("user", "created_at"),
+                name="shopping_sh_user_id_a6a311_idx",
+            ),
         ]
 
     def __str__(self):
@@ -52,6 +108,11 @@ class ShoppingItem(models.Model):
     def toggle_purchased(self):
         self.is_purchased = not self.is_purchased
         self.purchased_at = timezone.now() if self.is_purchased else None
+
+    def clean(self):
+        if self.shopping_list and self.shopping_list.user_id != self.user_id:
+            raise ValidationError({"shopping_list": "Lista invalida para este usuario."})
+
     def save(self, *args, **kwargs):
         if self.is_purchased and self.purchased_at is None:
             self.purchased_at = timezone.now()

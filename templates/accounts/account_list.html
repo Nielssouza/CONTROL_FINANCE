@@ -23,7 +23,10 @@
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <p class="app-item-title">{{ account.name }}</p>
-                            <p class="app-item-meta">{{ account.get_account_type_display }}</p>
+                            <p class="app-item-meta">
+                                {{ account.get_account_type_display }}
+                                {% if not account.include_in_balance %}| Fora do saldo{% endif %}
+                            </p>
                         </div>
                         {% if account.is_active %}
                             <span class="badge badge-income">Ativa</span>
@@ -31,7 +34,11 @@
                             <span class="badge badge-expense">Inativa</span>
                         {% endif %}
                     </div>
-                    <p class="app-item-value mt-3">Saldo: {{ account.balance|brl }}</p>
+                    {% if account.include_in_balance %}
+                        <p class="app-item-value mt-3">Saldo: {{ account.balance|brl }}</p>
+                    {% else %}
+                        <p class="app-item-value mt-3">Saldo desconsiderado</p>
+                    {% endif %}
                     <div class="app-inline-actions mt-3">
                         <a href="{% url 'accounts:update' account.pk %}" class="app-link-edit">Editar</a>
                         <a href="{% url 'accounts:delete' account.pk %}" class="app-link-danger">Excluir</a>

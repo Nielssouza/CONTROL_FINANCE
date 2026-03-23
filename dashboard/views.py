@@ -7,7 +7,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from accounts.models import Account
+from common.balance import calculate_user_balance
 from goals.models import SavingGoal
 from transactions.models import Transaction
 
@@ -228,28 +228,8 @@ class DashboardContextMixin(LoginRequiredMixin):
             transaction_type=Transaction.TransactionType.EXPENSE
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
-        initial_total = Account.objects.filter(user=user, is_active=True).aggregate(
-            total=Coalesce(Sum("initial_balance"), Decimal("0.00"))
-        )["total"]
-
         end_of_selected_month = self._shift_month(selected_month, 1) - timedelta(days=1)
         balance_cutoff_date = end_of_selected_month
-
-        total_income = Transaction.objects.filter(
-            user=user,
-            transaction_type=Transaction.TransactionType.INCOME,
-            is_cleared=True,
-            is_ignored=False,
-            date__lte=balance_cutoff_date,
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-
-        total_expense = Transaction.objects.filter(
-            user=user,
-            transaction_type=Transaction.TransactionType.EXPENSE,
-            is_cleared=True,
-            is_ignored=False,
-            date__lte=balance_cutoff_date,
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
         latest_transactions = (
             Transaction.objects.filter(user=user, is_ignored=False)
@@ -317,7 +297,7 @@ class DashboardContextMixin(LoginRequiredMixin):
         )
 
         return {
-            "total_balance": initial_total + total_income - total_expense,
+            "total_balance": calculate_user_balance(user, balance_cutoff_date),
             "monthly_income": monthly_income,
             "monthly_expense": monthly_expense,
             "category_title": category_title,

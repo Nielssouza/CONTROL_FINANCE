@@ -470,6 +470,54 @@ class TransactionScopeAndMonthLockTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["current_balance"], Decimal("7000.00"))
 
+    def test_statement_current_balance_excludes_card_transactions_and_applies_card_payment(self):
+        card_account = Account.objects.create(
+            user=self.user,
+            name="Cartao de Credito",
+            account_type=Account.AccountType.BANK,
+            initial_balance=Decimal("0.00"),
+            is_active=True,
+            include_in_balance=False,
+        )
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Cartao credito",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        self.account.initial_balance = Decimal("1000.00")
+        self.account.save(update_fields=["initial_balance"])
+
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("600.00"),
+            date=date(2026, 3, 10),
+            account=card_account,
+            category=expense_category,
+            description="Compra no cartao",
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+            is_cleared=True,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.TRANSFER,
+            amount=Decimal("400.00"),
+            date=date(2026, 3, 15),
+            account=self.account,
+            destination_account=card_account,
+            description="Pagamento da fatura",
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+            is_cleared=True,
+        )
+
+        response = self.client.get(
+            reverse("transactions:statement"),
+            {"month": "2026-03"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["current_balance"], Decimal("600.00"))
+
     def test_statement_shows_ignore_action_for_income(self):
         response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
 
@@ -532,6 +580,122 @@ class TransactionScopeAndMonthLockTests(TestCase):
         after_response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
         self.assertEqual(after_response.status_code, 200)
         self.assertEqual(after_response.context["monthly_balance"], Decimal("6500.00"))
+
+    def test_monthly_balance_excludes_card_transactions_and_applies_card_payment(self):
+        card_account = Account.objects.create(
+            user=self.user,
+            name="Cartao mensal",
+            account_type=Account.AccountType.BANK,
+            initial_balance=Decimal("0.00"),
+            is_active=True,
+            include_in_balance=False,
+        )
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Cartao mensal",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.INCOME,
+            amount=Decimal("1000.00"),
+            date=date(2026, 2, 8),
+            account=self.account,
+            category=self.category,
+            description="Receita",
+            is_cleared=True,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("600.00"),
+            date=date(2026, 2, 10),
+            account=card_account,
+            category=expense_category,
+            description="Compra no cartao",
+            is_cleared=True,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.TRANSFER,
+            amount=Decimal("400.00"),
+            date=date(2026, 2, 12),
+            account=self.account,
+            destination_account=card_account,
+            description="Pagamento da fatura",
+            is_cleared=True,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["monthly_balance"], Decimal("7600.00"))
+
+    def test_monthly_balance_for_bank_account_filter_includes_transfer_to_card(self):
+        card_account = Account.objects.create(
+            user=self.user,
+            name="Cartao filtro",
+            account_type=Account.AccountType.BANK,
+            initial_balance=Decimal("0.00"),
+            is_active=True,
+            include_in_balance=False,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.TRANSFER,
+            amount=Decimal("400.00"),
+            date=date(2026, 2, 12),
+            account=self.account,
+            destination_account=card_account,
+            description="Pagamento da fatura",
+            is_cleared=True,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        response = self.client.get(
+            reverse("transactions:statement"),
+            {"month": "2026-02", "account": self.account.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["monthly_balance"], Decimal("6600.00"))
+
+    def test_monthly_balance_for_card_account_filter_is_zero(self):
+        card_account = Account.objects.create(
+            user=self.user,
+            name="Cartao filtrado",
+            account_type=Account.AccountType.BANK,
+            initial_balance=Decimal("0.00"),
+            is_active=True,
+            include_in_balance=False,
+        )
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Despesa cartao",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("600.00"),
+            date=date(2026, 2, 10),
+            account=card_account,
+            category=expense_category,
+            description="Compra no cartao",
+            is_cleared=True,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        response = self.client.get(
+            reverse("transactions:statement"),
+            {"month": "2026-02", "account": card_account.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["monthly_balance"], Decimal("0.00"))
 
     def test_toggle_cleared_with_htmx_returns_redirect_header(self):
         response = self.client.post(

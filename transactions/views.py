@@ -1,11 +1,9 @@
 import json
 from datetime import date, timedelta
-from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import F, Q, Sum
-from django.db.models.functions import Coalesce
+from django.db.models import F, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -14,7 +12,7 @@ from django.utils.formats import date_format
 from django.views import View
 from django.views.generic import CreateView, DeleteView, TemplateView, UpdateView
 
-from accounts.models import Account
+from common.balance import calculate_monthly_balance, calculate_user_balance
 from common.mixins import UserAssignMixin, UserQuerySetMixin
 from transactions.forms import QuickTransactionForm, StatementFilterForm, TransactionForm
 from transactions.models import ClosedMonth, Transaction
@@ -364,52 +362,22 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
     def get_balances(self, form, selected_month):
         user = self.request.user
         balance_cutoff_date = self.get_balance_cutoff_date(selected_month)
+        current_balance = calculate_user_balance(user, balance_cutoff_date)
 
-        initial_total = Account.objects.filter(user=user, is_active=True).aggregate(
-            total=Coalesce(Sum("initial_balance"), Decimal("0.00"))
-        )["total"]
-
-        total_income = Transaction.objects.filter(
-            user=user,
-            transaction_type=Transaction.TransactionType.INCOME,
-            is_cleared=True,
-            is_ignored=False,
-            date__lte=balance_cutoff_date,
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-        total_expense = Transaction.objects.filter(
-            user=user,
-            transaction_type=Transaction.TransactionType.EXPENSE,
-            is_cleared=True,
-            is_ignored=False,
-            date__lte=balance_cutoff_date,
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-        current_balance = initial_total + total_income - total_expense
-
-        monthly_queryset = Transaction.objects.filter(
-            user=user,
-            is_ignored=False,
-            date__year=selected_month.year,
-            date__month=selected_month.month,
-        )
-
+        account = None
+        category = None
         if form.is_valid():
             account = form.cleaned_data.get("account")
             category = form.cleaned_data.get("category")
-            if account:
-                monthly_queryset = monthly_queryset.filter(
-                    Q(account=account) | Q(destination_account=account)
-                )
-            if category:
-                monthly_queryset = monthly_queryset.filter(category=category)
 
-        monthly_income = monthly_queryset.filter(
-            transaction_type=Transaction.TransactionType.INCOME
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-        monthly_expense = monthly_queryset.filter(
-            transaction_type=Transaction.TransactionType.EXPENSE
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+        monthly_balance = calculate_monthly_balance(
+            user,
+            selected_month,
+            account=account,
+            category=category,
+        )
 
-        return current_balance, monthly_income - monthly_expense
+        return current_balance, monthly_balance
 
     def get_filtered_transactions(self, form, selected_month):
         queryset = Transaction.objects.filter(user=self.request.user).select_related(

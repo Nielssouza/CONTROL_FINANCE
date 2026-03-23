@@ -127,6 +127,42 @@ class DashboardChartsMonthScopeTests(TestCase):
         self.assertEqual(response.context["total_balance"], Decimal("0.00"))
         self.assertTrue(Transaction.objects.filter(pk=march_income.pk, is_cleared=True).exists())
 
+    def test_home_total_balance_excludes_card_transactions_and_applies_card_payment(self):
+        card_account = Account.objects.create(
+            user=self.user,
+            name="Cartao de Credito",
+            account_type=Account.AccountType.BANK,
+            initial_balance=Decimal("0.00"),
+            include_in_balance=False,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("600.00"),
+            date=date(2026, 3, 10),
+            account=card_account,
+            category=self.category,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+            is_cleared=True,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.TRANSFER,
+            amount=Decimal("400.00"),
+            date=date(2026, 3, 15),
+            account=self.account,
+            destination_account=card_account,
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+            is_cleared=True,
+        )
+        self.account.initial_balance = Decimal("1000.00")
+        self.account.save(update_fields=["initial_balance"])
+
+        response = self.client.get(reverse("dashboard:home"), {"month": "2026-03"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_balance"], Decimal("600.00"))
+
 class DashboardPostLoginLoaderTests(TestCase):
     def setUp(self):
         user_model = get_user_model()

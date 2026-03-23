@@ -2,8 +2,6 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
-from django.db.models import Sum
-from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 
@@ -31,6 +29,14 @@ class Account(models.Model):
         decimal_places=2,
         default=Decimal("0.00"),
     )
+    include_in_balance = models.BooleanField(
+        "Considerar no saldo",
+        default=True,
+        help_text=(
+            "Desmarque para contas que nao devem compor os saldos "
+            "consolidados, como cartao de credito."
+        ),
+    )
     is_active = models.BooleanField("Ativa", default=True)
     created_at = models.DateTimeField("Criada em", auto_now_add=True)
     updated_at = models.DateTimeField("Atualizada em", auto_now=True)
@@ -50,36 +56,6 @@ class Account(models.Model):
 
     @property
     def balance(self) -> Decimal:
-        today = timezone.localdate()
+        from common.balance import calculate_account_balance
 
-        posted_transactions = self.transactions.filter(
-            is_cleared=True,
-            is_ignored=False,
-            date__lte=today,
-        )
-        income = posted_transactions.filter(transaction_type="income").aggregate(
-            total=Coalesce(Sum("amount"), Decimal("0.00"))
-        )["total"]
-        expenses = posted_transactions.filter(transaction_type="expense").aggregate(
-            total=Coalesce(Sum("amount"), Decimal("0.00"))
-        )["total"]
-        outgoing_transfers = posted_transactions.filter(
-            transaction_type="transfer"
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-
-        incoming_transfers = self.incoming_transfers.filter(
-            transaction_type="transfer",
-            is_cleared=True,
-            is_ignored=False,
-            date__lte=today,
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-
-        return (
-            self.initial_balance
-            + income
-            + incoming_transfers
-            - expenses
-            - outgoing_transfers
-        )
-
-
+        return calculate_account_balance(self, cutoff_date=timezone.localdate())
