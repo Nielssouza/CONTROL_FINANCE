@@ -16,10 +16,12 @@ def move_existing_items_to_default_lists(apps, schema_editor):
     )
 
     for user_id in user_ids:
-        shopping_list = ShoppingList.objects.create(
+        shopping_list, _ = ShoppingList.objects.get_or_create(
             user_id=user_id,
             name="Lista principal",
-            notes="Migrada automaticamente da lista antiga.",
+            defaults={
+                "notes": "Migrada automaticamente da lista antiga.",
+            },
         )
         ShoppingItem.objects.filter(
             user_id=user_id,
