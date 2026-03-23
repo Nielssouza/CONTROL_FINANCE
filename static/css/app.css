@@ -2737,6 +2737,282 @@ body {
     }
 }
 
+/* Monochrome palette override: black surfaces and white icons/text, while
+   monetary state colors remain defined by their existing amount classes. */
+:root {
+    --mono-bg: #000000;
+    --mono-surface: #050505;
+    --mono-surface-alt: #0c0c0c;
+    --mono-border: rgba(255, 255, 255, 0.12);
+    --mono-border-strong: rgba(255, 255, 255, 0.22);
+    --mono-text: #ffffff;
+    --mono-muted: rgba(255, 255, 255, 0.76);
+    --mono-soft: rgba(255, 255, 255, 0.58);
+}
+
+body,
+.bg-app,
+.transactions-body,
+.dash-body {
+    background: linear-gradient(180deg, #050505 0%, #000000 100%) !important;
+    color: var(--mono-text);
+}
+
+.bg-app,
+.transactions-body {
+    background:
+        radial-gradient(circle at 50% -20%, rgba(255, 255, 255, 0.05), transparent 35%),
+        linear-gradient(180deg, #050505 0%, #000000 100%) !important;
+}
+
+.app-shell,
+.transactions-shell,
+.dash-shell,
+.app-header,
+.app-bottom-nav,
+.txn-bottom-nav,
+.dash-bottom-nav,
+.card,
+.txn-balance-card,
+.dash-hero-card,
+.dash-alert-card,
+.dash-category-card,
+.dash-goal-card,
+.charts-card,
+.app-modal-panel,
+.dash-user-menu-panel,
+.dash-due-panel,
+.login-loader-card,
+.post-login-loader-card,
+.txn-search-wrap,
+.charts-segmented,
+.charts-donut-center,
+.dash-due-item,
+.shopping-quick-toggle,
+.goal-progress-track,
+.dash-goal-progress-track {
+    background: linear-gradient(180deg, var(--mono-surface-alt) 0%, var(--mono-bg) 100%) !important;
+    border-color: var(--mono-border) !important;
+    box-shadow: none !important;
+}
+
+.app-open-loader-overlay,
+.login-loader-overlay,
+.post-login-loader-overlay {
+    background:
+        radial-gradient(circle at 50% -20%, rgba(255, 255, 255, 0.06), transparent 36%),
+        linear-gradient(180deg, rgba(5, 5, 5, 0.96) 0%, rgba(0, 0, 0, 0.98) 100%) !important;
+}
+
+.app-brand,
+.app-title,
+.app-title-sm,
+.app-page,
+.transactions-screen,
+.dash-screen,
+.charts-screen,
+.app-item-title,
+.shopping-summary-value,
+.shopping-quick-toggle,
+.shopping-quick-toggle-box,
+.shopping-quick-toggle-text,
+.nav-item,
+.txn-tab-link,
+.dash-tab-link,
+.charts-circle-btn,
+.charts-segment-btn,
+.charts-title,
+.charts-ranking-title,
+.charts-month-title,
+.charts-list-name,
+.charts-donut-value,
+.charts-rank,
+.app-top-action,
+.app-btn-primary,
+.app-btn-secondary,
+.app-btn-danger,
+.app-mini-btn,
+.app-mini-btn-view,
+.app-link-inline,
+.app-link-edit,
+.app-link-danger,
+.dash-goal-more,
+.dash-due-link,
+.dash-user-menu-link,
+.dash-user-menu-logout,
+.dash-due-title,
+.dash-due-name,
+.dash-due-date,
+.dash-user-menu-name,
+.txn-day-label,
+.txn-month-title,
+.charts-floating-switch {
+    color: var(--mono-text) !important;
+}
+
+.app-subtitle,
+.app-muted-text,
+.app-user-chip,
+.app-item-meta,
+.app-touch-hint,
+.app-field-label,
+.app-field-help,
+.shopping-summary-label,
+.shopping-item-notes,
+.shopping-item-title-done,
+.txn-balance-label,
+.txn-search-icon,
+.dash-balance-label,
+.dash-flow-label,
+.dash-section-title,
+.dash-user-menu-meta,
+.dash-due-meta,
+.dash-due-sub,
+.dash-due-empty,
+.dash-goal-remaining,
+.charts-donut-label,
+.charts-list-meta,
+.charts-list-percent,
+.charts-ranking-note,
+.charts-trend-label,
+.charts-trend-value,
+.charts-chip,
+.charts-ranking-scope,
+.charts-month-arrow,
+.txn-month-arrow,
+.dash-month-arrow,
+.app-empty-card {
+    color: var(--mono-muted) !important;
+}
+
+.app-top-action,
+.app-btn-primary,
+.app-btn-secondary,
+.app-btn-danger,
+.app-mini-btn,
+.app-mini-btn-view,
+.app-fab,
+.app-center-fab,
+.txn-center-fab,
+.dash-center-fab,
+.dash-manage-home-btn,
+.dash-user-menu-link,
+.dash-user-menu-logout,
+.dash-due-link,
+.charts-circle-btn,
+.charts-floating-switch,
+.charts-segment-btn,
+.charts-segment-btn-active {
+    background: var(--mono-surface-alt) !important;
+    border: 1px solid var(--mono-border-strong) !important;
+    color: var(--mono-text) !important;
+    box-shadow: none !important;
+}
+
+.nav-item-active,
+.txn-tab-active,
+.txn-tab-link[aria-current="page"],
+.dash-tab-active,
+.dash-tab-link[aria-current="page"],
+.charts-segment-btn-active {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: var(--mono-border-strong) !important;
+    color: var(--mono-text) !important;
+    box-shadow: none !important;
+}
+
+.nav-item,
+.nav-item-active,
+.txn-tab-link,
+.dash-tab-link,
+.txn-tab-icon,
+.dash-tab-icon,
+.txn-item-icon-wrap,
+.dash-icon-btn-notify,
+.dash-gift-btn,
+.dash-goals-icon,
+.dash-alert-icon,
+.dash-goal-badge,
+.dash-flow-icon,
+.charts-circle-btn,
+.charts-floating-switch,
+.app-fab,
+.app-center-fab,
+.txn-center-fab,
+.dash-center-fab {
+    color: var(--mono-text) !important;
+}
+
+.txn-item-icon-wrap,
+.dash-alert-icon,
+.dash-goal-badge,
+.dash-flow-icon-income,
+.dash-flow-icon-expense,
+.shopping-quick-toggle-box,
+.charts-rank,
+.charts-chip,
+.charts-ranking-scope {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: var(--mono-border-strong) !important;
+    color: var(--mono-text) !important;
+}
+
+.shopping-quick-toggle.is-checked,
+.shopping-quick-toggle.is-checked .shopping-quick-toggle-box,
+.shopping-quick-toggle.is-checked .shopping-quick-toggle-text,
+.badge,
+.badge-income,
+.badge-expense,
+.badge-transfer {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: var(--mono-border) !important;
+    color: var(--mono-text) !important;
+}
+
+.shopping-quick-toggle-box svg {
+    color: currentColor !important;
+}
+
+.dash-notify-dot {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border-color: #000000 !important;
+}
+
+.dash-due-status-overdue,
+.dash-due-status-today,
+.dash-due-status-open {
+    color: var(--mono-text) !important;
+}
+
+.txn-search-input,
+.txn-search-input::placeholder,
+.app-modal-content input,
+.app-modal-content select,
+.app-modal-content textarea {
+    color: var(--mono-text) !important;
+}
+
+.app-page input:not([type="checkbox"]):not([type="radio"]),
+.app-page select,
+.app-page textarea,
+.transactions-screen input,
+.transactions-screen select,
+.transactions-screen textarea,
+.dash-screen input,
+.dash-screen select,
+.dash-screen textarea {
+    background: var(--mono-surface) !important;
+    border-color: var(--mono-border) !important;
+    color: var(--mono-text) !important;
+    box-shadow: none !important;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: #ffffff;
+}
+
 
 
 
