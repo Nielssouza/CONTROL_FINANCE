@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 
+from common.tenancy import assign_tenant
+
 
 class Category(models.Model):
     class CategoryType(models.TextChoices):
@@ -11,6 +13,13 @@ class Category(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="categories",
+    )
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        on_delete=models.CASCADE,
+        related_name="categories",
+        null=True,
+        blank=True,
     )
     name = models.CharField("Nome", max_length=80)
     category_type = models.CharField(
@@ -27,10 +36,14 @@ class Category(models.Model):
         verbose_name_plural = "Categorias"
         constraints = [
             models.UniqueConstraint(
-                fields=("user", "name", "category_type"),
-                name="unique_category_name_type_per_user",
+                fields=("tenant", "name", "category_type"),
+                name="unique_category_name_type_per_tenant",
             )
         ]
 
     def __str__(self):
         return f"{self.name} ({self.get_category_type_display()})"
+
+    def save(self, *args, **kwargs):
+        assign_tenant(self)
+        return super().save(*args, **kwargs)

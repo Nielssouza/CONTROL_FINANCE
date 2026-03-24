@@ -7,12 +7,21 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from common.tenancy import assign_tenant
+
 
 class SavingGoal(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="saving_goals",
+    )
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        on_delete=models.CASCADE,
+        related_name="saving_goals",
+        null=True,
+        blank=True,
     )
     name = models.CharField("Nome", max_length=120)
     target_amount = models.DecimalField("Valor alvo", max_digits=12, decimal_places=2)
@@ -53,6 +62,7 @@ class SavingGoal(models.Model):
             raise ValidationError({"target_amount": "Informe um valor alvo maior que zero."})
 
     def save(self, *args, **kwargs):
+        assign_tenant(self)
         self.full_clean()
         return super().save(*args, **kwargs)
 
@@ -62,6 +72,13 @@ class GoalEntry(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="goal_entries",
+    )
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        on_delete=models.CASCADE,
+        related_name="goal_entries",
+        null=True,
+        blank=True,
     )
     goal = models.ForeignKey(
         SavingGoal,
@@ -79,7 +96,7 @@ class GoalEntry(models.Model):
         verbose_name = "Lancamento do objetivo"
         verbose_name_plural = "Lancamentos do objetivo"
         indexes = [
-            models.Index(fields=("user", "date")),
+            models.Index(fields=("tenant", "date")),
             models.Index(fields=("goal", "date")),
         ]
 
@@ -87,12 +104,14 @@ class GoalEntry(models.Model):
         return f"{self.goal.name} - R$ {self.amount}"
 
     def clean(self):
+        assign_tenant(self)
         if self.amount <= 0:
             raise ValidationError({"amount": "Informe um valor maior que zero."})
 
-        if self.goal_id and self.user_id and self.goal.user_id != self.user_id:
-            raise ValidationError({"goal": "Objetivo invalido para este usuario."})
+        if self.goal_id and self.tenant_id and self.goal.tenant_id != self.tenant_id:
+            raise ValidationError({"goal": "Objetivo invalido para este cliente."})
 
     def save(self, *args, **kwargs):
+        assign_tenant(self)
         self.full_clean()
         return super().save(*args, **kwargs)

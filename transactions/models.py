@@ -8,12 +8,21 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
+from common.tenancy import assign_tenant
+
 
 class ClosedMonth(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="closed_months",
+    )
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        on_delete=models.CASCADE,
+        related_name="closed_months",
+        null=True,
+        blank=True,
     )
     year = models.PositiveSmallIntegerField(
         "Ano",
@@ -33,13 +42,17 @@ class ClosedMonth(models.Model):
         verbose_name_plural = "Meses fechados"
         constraints = [
             models.UniqueConstraint(
-                fields=("user", "year", "month"),
-                name="unique_closed_month_per_user",
+                fields=("tenant", "year", "month"),
+                name="unique_closed_month_per_tenant",
             )
         ]
 
     def __str__(self):
         return f"{self.month:02d}/{self.year} - {self.user}"
+
+    def save(self, *args, **kwargs):
+        assign_tenant(self)
+        return super().save(*args, **kwargs)
 
 
 class Transaction(models.Model):
@@ -68,6 +81,13 @@ class Transaction(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="transactions",
+    )
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        on_delete=models.CASCADE,
+        related_name="transactions",
+        null=True,
+        blank=True,
     )
     transaction_type = models.CharField(
         "Tipo",
@@ -148,9 +168,9 @@ class Transaction(models.Model):
         verbose_name = "Transacao"
         verbose_name_plural = "Transacoes"
         indexes = [
-            models.Index(fields=("user", "date")),
-            models.Index(fields=("user", "transaction_type")),
-            models.Index(fields=("user", "is_cleared", "date")),
+            models.Index(fields=("tenant", "date")),
+            models.Index(fields=("tenant", "transaction_type")),
+            models.Index(fields=("tenant", "is_cleared", "date")),
         ]
 
     def __str__(self):
@@ -242,7 +262,7 @@ class Transaction(models.Model):
 
     def _occurrence_exists(self, target_date: date_cls) -> bool:
         return Transaction.objects.filter(
-            user=self.user,
+            tenant=self.tenant,
             transaction_type=self.transaction_type,
             amount=self.amount,
             date=target_date,
@@ -278,6 +298,7 @@ class Transaction(models.Model):
             upcoming_rows.append(
                 Transaction(
                     user=self.user,
+                    tenant=self.tenant,
                     transaction_type=self.transaction_type,
                     amount=self.amount,
                     date=target_date,
@@ -305,18 +326,20 @@ class Transaction(models.Model):
         return len(upcoming_rows)
 
     def clean(self):
+        assign_tenant(self)
+
         if self.amount <= 0:
             raise ValidationError({"amount": "Informe um valor maior que zero."})
 
-        if self.account and self.account.user_id != self.user_id:
-            raise ValidationError({"account": "Conta invalida para este usuario."})
+        if self.account and self.account.tenant_id != self.tenant_id:
+            raise ValidationError({"account": "Conta invalida para este cliente."})
 
-        if self.category and self.category.user_id != self.user_id:
-            raise ValidationError({"category": "Categoria invalida para este usuario."})
+        if self.category and self.category.tenant_id != self.tenant_id:
+            raise ValidationError({"category": "Categoria invalida para este cliente."})
 
-        if self.destination_account and self.destination_account.user_id != self.user_id:
+        if self.destination_account and self.destination_account.tenant_id != self.tenant_id:
             raise ValidationError(
-                {"destination_account": "Conta de destino invalida para este usuario."}
+                {"destination_account": "Conta de destino invalida para este cliente."}
             )
 
         if not self.recurrence_interval or self.recurrence_interval < 1:
@@ -381,5 +404,6 @@ class Transaction(models.Model):
                 )
 
     def save(self, *args, **kwargs):
+        assign_tenant(self)
         self.full_clean()
         return super().save(*args, **kwargs)

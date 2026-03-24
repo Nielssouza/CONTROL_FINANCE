@@ -57,6 +57,7 @@ class GoalDetailView(UserQuerySetMixin, DetailView):
         form.instance.user = request.user
 
         if form.is_valid():
+            form.instance.tenant = request.tenant
             form.save()
             messages.success(request, "Lancamento registrado no objetivo.")
             return redirect("goals:detail", pk=self.object.pk)

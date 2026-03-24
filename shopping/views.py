@@ -24,11 +24,12 @@ class ShoppingItemFormKwargsMixin:
         )
         if not list_pk:
             return None
-        return get_object_or_404(ShoppingList, pk=list_pk, user=self.request.user)
+        return get_object_or_404(ShoppingList, pk=list_pk, tenant=self.request.tenant)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
+        kwargs["tenant"] = self.request.tenant
         kwargs["selected_list"] = self.get_selected_list()
         return kwargs
 
@@ -55,7 +56,7 @@ class ShoppingListView(UserQuerySetMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        items_qs = ShoppingItem.objects.filter(user=self.request.user)
+        items_qs = ShoppingItem.objects.filter(tenant=self.request.tenant)
         purchased_qs = items_qs.filter(is_purchased=True)
 
         total_expr = ExpressionWrapper(
@@ -173,7 +174,7 @@ class ShoppingItemTogglePurchasedView(LoginRequiredMixin, View):
     success_url = reverse_lazy("shopping:list")
 
     def post(self, request, *args, **kwargs):
-        item = get_object_or_404(ShoppingItem, pk=kwargs.get("pk"), user=request.user)
+        item = get_object_or_404(ShoppingItem, pk=kwargs.get("pk"), tenant=request.tenant)
         item.toggle_purchased()
         item.save(update_fields=["is_purchased", "purchased_at", "updated_at"])
 

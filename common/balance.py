@@ -5,6 +5,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from common.tenancy import resolve_tenant
 from transactions.models import Transaction
 
 
@@ -57,17 +58,18 @@ def calculate_account_balance(account, cutoff_date=None):
     )
 
 
-def calculate_user_balance(user, cutoff_date):
+def calculate_user_balance(user, cutoff_date, tenant=None):
+    tenant = resolve_tenant(tenant=tenant, user=user)
     account_model = apps.get_model("accounts", "Account")
     posted_transactions = Transaction.objects.filter(
-        user=user,
+        tenant=tenant,
         is_cleared=True,
         is_ignored=False,
         date__lte=cutoff_date,
     )
 
     initial_total = tracked_accounts(
-        account_model.objects.filter(user=user, is_active=True)
+        account_model.objects.filter(tenant=tenant, is_active=True)
     ).aggregate(total=Coalesce(Sum("initial_balance"), ZERO))["total"]
 
     total_income = _sum_amount(
@@ -100,9 +102,10 @@ def calculate_user_balance(user, cutoff_date):
     )
 
 
-def calculate_monthly_balance(user, selected_month, account=None, category=None):
+def calculate_monthly_balance(user, selected_month, account=None, category=None, tenant=None):
+    tenant = resolve_tenant(tenant=tenant, user=user)
     monthly_transactions = Transaction.objects.filter(
-        user=user,
+        tenant=tenant,
         is_ignored=False,
         date__year=selected_month.year,
         date__month=selected_month.month,

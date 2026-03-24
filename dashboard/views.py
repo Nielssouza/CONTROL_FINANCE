@@ -173,13 +173,13 @@ class DashboardContextMixin(LoginRequiredMixin):
 
         return items, f"conic-gradient({', '.join(stops)})", total_amount
 
-    def _build_expense_trend(self, user, selected_month: date):
+    def _build_expense_trend(self, tenant, selected_month: date):
         points = []
         for offset in range(-5, 1):
             month_date = self._shift_month(selected_month, offset)
             total = (
                 Transaction.objects.filter(
-                    user=user,
+                    tenant=tenant,
                     transaction_type=Transaction.TransactionType.EXPENSE,
                     is_ignored=False,
                     date__year=month_date.year,
@@ -210,11 +210,12 @@ class DashboardContextMixin(LoginRequiredMixin):
 
     def get_dashboard_context(self):
         user = self.request.user
+        tenant = self.request.tenant
         today = timezone.localdate()
         selected_month = self._get_selected_month()
 
         current_month_transactions = Transaction.objects.filter(
-            user=user,
+            tenant=tenant,
             is_ignored=False,
             date__year=selected_month.year,
             date__month=selected_month.month,
@@ -232,7 +233,7 @@ class DashboardContextMixin(LoginRequiredMixin):
         balance_cutoff_date = end_of_selected_month
 
         latest_transactions = (
-            Transaction.objects.filter(user=user, is_ignored=False)
+            Transaction.objects.filter(tenant=tenant, is_ignored=False)
             .select_related("account", "category", "destination_account")
             .order_by("-date", "-created_at")[:6]
         )
@@ -240,7 +241,7 @@ class DashboardContextMixin(LoginRequiredMixin):
         due_window_end = today + timedelta(days=30)
         due_notifications_qs = (
             Transaction.objects.filter(
-                user=user,
+                tenant=tenant,
                 transaction_type=Transaction.TransactionType.EXPENSE,
                 is_cleared=False,
                 is_ignored=False,
@@ -276,7 +277,7 @@ class DashboardContextMixin(LoginRequiredMixin):
         )
 
         active_goal = (
-            SavingGoal.objects.filter(user=user, is_active=True)
+            SavingGoal.objects.filter(tenant=tenant, is_active=True)
             .order_by("-updated_at", "-created_at")
             .first()
         )
@@ -297,7 +298,7 @@ class DashboardContextMixin(LoginRequiredMixin):
         )
 
         return {
-            "total_balance": calculate_user_balance(user, balance_cutoff_date),
+            "total_balance": calculate_user_balance(user, balance_cutoff_date, tenant=tenant),
             "monthly_income": monthly_income,
             "monthly_expense": monthly_expense,
             "category_title": category_title,
@@ -381,7 +382,7 @@ class DashboardChartsView(DashboardContextMixin, TemplateView):
 
         selected_month = self._get_selected_month()
         monthly_expense_queryset = Transaction.objects.filter(
-            user=self.request.user,
+            tenant=self.request.tenant,
             transaction_type=Transaction.TransactionType.EXPENSE,
             is_ignored=False,
             date__year=selected_month.year,
@@ -398,7 +399,7 @@ class DashboardChartsView(DashboardContextMixin, TemplateView):
         for idx, item in enumerate(charts_items, start=1):
             item["rank"] = idx
 
-        trend_points = self._build_expense_trend(self.request.user, selected_month)
+        trend_points = self._build_expense_trend(self.request.tenant, selected_month)
 
         context.update(
             {

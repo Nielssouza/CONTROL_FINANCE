@@ -4,6 +4,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from common.tenancy import assign_tenant
+
 
 class Account(models.Model):
     class AccountType(models.TextChoices):
@@ -15,6 +17,13 @@ class Account(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="accounts",
+    )
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        on_delete=models.CASCADE,
+        related_name="accounts",
+        null=True,
+        blank=True,
     )
     name = models.CharField("Nome", max_length=120)
     account_type = models.CharField(
@@ -47,7 +56,7 @@ class Account(models.Model):
         verbose_name_plural = "Contas"
         constraints = [
             models.UniqueConstraint(
-                fields=("user", "name"), name="unique_account_name_per_user"
+                fields=("tenant", "name"), name="unique_account_name_per_tenant"
             )
         ]
 
@@ -59,3 +68,7 @@ class Account(models.Model):
         from common.balance import calculate_account_balance
 
         return calculate_account_balance(self, cutoff_date=timezone.localdate())
+
+    def save(self, *args, **kwargs):
+        assign_tenant(self)
+        return super().save(*args, **kwargs)

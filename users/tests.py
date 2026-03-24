@@ -2,6 +2,7 @@ from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.urls import reverse
 
 from users.forms import StyledAuthenticationForm
@@ -74,3 +75,93 @@ class UserAuthFlowTests(TestCase):
         self.assertEqual(form.fields["password"].widget.attrs.get("autocomplete"), "current-password")
         self.assertEqual(form.fields["password"].widget.attrs.get("autocapitalize"), "none")
         self.assertFalse(form.fields["password"].strip)
+
+    @override_settings(PUBLIC_SIGNUP_ENABLED=True)
+    def test_register_creates_inactive_user_and_redirects_to_login(self):
+        response = self.client.post(
+            reverse("users:register"),
+            {
+                "username": "pending-user",
+                "email": "pending@example.com",
+                "password1": "Strong-pass-123",
+                "password2": "Strong-pass-123",
+            },
+            follow=True,
+        )
+
+        created_user = get_user_model().objects.get(username="pending-user")
+
+        self.assertFalse(created_user.is_active)
+        self.assertRedirects(response, reverse("users:login"))
+        self.assertContains(response, "Aguarde a validacao do administrador")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    @override_settings(PUBLIC_SIGNUP_ENABLED=True)
+    def test_register_rejects_duplicate_email_case_insensitive(self):
+        get_user_model().objects.create_user(
+            username="existing-user",
+            email="dup@example.com",
+            password="Strong-pass-123",
+        )
+
+        response = self.client.post(
+            reverse("users:register"),
+            {
+                "username": "new-user",
+                "email": "DUP@example.com",
+                "password1": "Strong-pass-123",
+                "password2": "Strong-pass-123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ja existe um cadastro com este e-mail.")
+
+    def test_inactive_user_sees_pending_approval_message_on_login(self):
+        pending_user = get_user_model().objects.create_user(
+            username="inactive-user",
+            email="inactive@example.com",
+            password="Strong-pass-123",
+            is_active=False,
+        )
+
+        response = self.client.post(
+            reverse("users:login"),
+            {"username": pending_user.username, "password": "Strong-pass-123"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Seu cadastro foi recebido e aguarda validacao do administrador.",
+        )
+
+    def test_admin_action_can_activate_selected_users(self):
+        admin_user = get_user_model().objects.create_superuser(
+            username="admin-review",
+            email="admin-review@example.com",
+            password="Strong-pass-123",
+        )
+        pending_user = get_user_model().objects.create_user(
+            username="to-approve",
+            email="to-approve@example.com",
+            password="Strong-pass-123",
+            is_active=False,
+        )
+        self.client.force_login(admin_user)
+
+        response = self.client.post(
+            reverse("admin:auth_user_changelist"),
+            {
+                "action": "approve_selected_users",
+                "_selected_action": [str(pending_user.pk)],
+                "index": 0,
+            },
+            follow=True,
+        )
+
+        pending_user.refresh_from_db()
+
+        self.assertTrue(pending_user.is_active)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "cadastro(s) validado(s) e ativado(s)")

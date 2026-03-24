@@ -22,6 +22,7 @@ class TransactionFormKwargsMixin:
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
+        kwargs["tenant"] = self.request.tenant
         return kwargs
 
 
@@ -31,7 +32,7 @@ class MonthLockMixin:
 
     def is_month_closed(self, target_date):
         return ClosedMonth.objects.filter(
-            user=self.request.user,
+            tenant=self.request.tenant,
             is_closed=True,
             year=target_date.year,
             month=target_date.month,
@@ -43,7 +44,7 @@ class MonthLockMixin:
             return False
 
         closed_pairs = set(
-            ClosedMonth.objects.filter(user=self.request.user, is_closed=True).values_list(
+            ClosedMonth.objects.filter(tenant=self.request.tenant, is_closed=True).values_list(
                 "year", "month"
             )
         )
@@ -81,7 +82,7 @@ class RecurrenceScopeMixin:
         ]
 
     def get_related_occurrences_queryset(self, reference_transaction):
-        queryset = Transaction.objects.filter(user=self.request.user).exclude(
+        queryset = Transaction.objects.filter(tenant=self.request.tenant).exclude(
             pk=reference_transaction.pk
         )
 
@@ -108,7 +109,7 @@ class RecurrenceScopeMixin:
                     "pk", flat=True
                 )
             )
-        return Transaction.objects.filter(user=self.request.user, pk__in=ids)
+        return Transaction.objects.filter(tenant=self.request.tenant, pk__in=ids)
 
     def update_related_occurrences(self, reference_transaction, updated_transaction):
         update_payload = {
@@ -190,7 +191,10 @@ class TransactionUpdateView(
 
     def form_valid(self, form):
         scope = self.get_scope()
-        reference_transaction = Transaction.objects.get(pk=self.object.pk, user=self.request.user)
+        reference_transaction = Transaction.objects.get(
+            pk=self.object.pk,
+            tenant=self.request.tenant,
+        )
         target_queryset = self.get_scope_queryset(reference_transaction, scope)
 
         if not self.ensure_month_unlocked(target_queryset, form=form):
@@ -280,7 +284,11 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
     template_name = "transactions/statement.html"
 
     def get_filter_form(self):
-        return StatementFilterForm(self.request.GET, user=self.request.user)
+        return StatementFilterForm(
+            self.request.GET,
+            user=self.request.user,
+            tenant=self.request.tenant,
+        )
 
     @staticmethod
     def month_value_to_date(month_value):
@@ -361,8 +369,9 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
 
     def get_balances(self, form, selected_month):
         user = self.request.user
+        tenant = self.request.tenant
         balance_cutoff_date = self.get_balance_cutoff_date(selected_month)
-        current_balance = calculate_user_balance(user, balance_cutoff_date)
+        current_balance = calculate_user_balance(user, balance_cutoff_date, tenant=tenant)
 
         account = None
         category = None
@@ -375,12 +384,13 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
             selected_month,
             account=account,
             category=category,
+            tenant=tenant,
         )
 
         return current_balance, monthly_balance
 
     def get_filtered_transactions(self, form, selected_month):
-        queryset = Transaction.objects.filter(user=self.request.user).select_related(
+        queryset = Transaction.objects.filter(tenant=self.request.tenant).select_related(
             "account", "destination_account", "category"
         )
         return self.apply_filters(queryset, form, selected_month)
@@ -441,7 +451,7 @@ class TransactionToggleClearedView(LoginRequiredMixin, View):
         return next_url
 
     def post(self, request, *args, **kwargs):
-        tx = get_object_or_404(Transaction, pk=kwargs.get("pk"), user=request.user)
+        tx = get_object_or_404(Transaction, pk=kwargs.get("pk"), tenant=request.tenant)
         tx.is_cleared = not tx.is_cleared
         if tx.is_cleared:
             tx.is_ignored = False
@@ -468,7 +478,7 @@ class TransactionToggleIgnoredView(LoginRequiredMixin, View):
         return next_url
 
     def post(self, request, *args, **kwargs):
-        tx = get_object_or_404(Transaction, pk=kwargs.get("pk"), user=request.user)
+        tx = get_object_or_404(Transaction, pk=kwargs.get("pk"), tenant=request.tenant)
 
         tx.is_ignored = not tx.is_ignored
         if tx.is_ignored:
@@ -495,6 +505,7 @@ class QuickTransactionCreateView(
 
     def form_valid(self, form):
         form.instance.user = self.request.user
+        form.instance.tenant = self.request.tenant
         self.object = form.save()
         if self.object.recurrence_type != Transaction.RecurrenceType.ONCE:
             self.object.generate_future_occurrences()

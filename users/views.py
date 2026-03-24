@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login
 from django.contrib.auth.views import LoginView, LogoutView
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
@@ -13,7 +12,7 @@ from users.forms import RegisterForm, StyledAuthenticationForm
 class RegisterView(CreateView):
     form_class = RegisterForm
     template_name = "users/register.html"
-    success_url = reverse_lazy("dashboard:home")
+    success_url = reverse_lazy("users:login")
 
     def dispatch(self, request, *args, **kwargs):
         if not getattr(settings, "PUBLIC_SIGNUP_ENABLED", False):
@@ -22,9 +21,14 @@ class RegisterView(CreateView):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        response = super().form_valid(form)
-        login(self.request, self.object)
-        return response
+        self.object = form.save(commit=False)
+        self.object.is_active = False
+        self.object.save()
+        messages.success(
+            self.request,
+            "Cadastro enviado com sucesso. Aguarde a validacao do administrador para acessar.",
+        )
+        return redirect(self.get_success_url())
 
 
 class UserLoginView(LoginView):

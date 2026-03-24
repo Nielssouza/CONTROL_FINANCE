@@ -1,6 +1,7 @@
 from django import forms
 
 from common.forms import style_form_fields
+from common.tenancy import resolve_tenant
 from shopping.models import ShoppingItem, ShoppingList
 
 
@@ -50,13 +51,15 @@ class ShoppingItemForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
+        tenant = resolve_tenant(tenant=kwargs.pop("tenant", None), user=user)
         selected_list = kwargs.pop("selected_list", None)
         super().__init__(*args, **kwargs)
         style_form_fields(self)
 
         self.instance.user = user
+        self.instance.tenant = tenant
         self.fields["shopping_list"].queryset = ShoppingList.objects.filter(
-            user=user
+            tenant=tenant
         ).order_by("name")
         if selected_list and not self.is_bound:
             self.fields["shopping_list"].initial = selected_list

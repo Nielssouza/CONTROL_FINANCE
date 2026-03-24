@@ -7,6 +7,7 @@ from django import forms
 from accounts.models import Account
 from categories.models import Category
 from common.forms import style_form_fields
+from common.tenancy import resolve_tenant
 from transactions.models import Transaction
 
 
@@ -59,9 +60,11 @@ class TransactionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
+        tenant = resolve_tenant(tenant=kwargs.pop("tenant", None), user=user)
         super().__init__(*args, **kwargs)
 
         self.instance.user = user
+        self.instance.tenant = tenant
 
         if "recurrence_type" in self.fields:
             self.fields["recurrence_type"].choices = [
@@ -92,7 +95,7 @@ class TransactionForm(forms.ModelForm):
             self.fields["is_cleared"].required = False
             self.fields["is_cleared"].help_text = "Desmarcada = pendente."
 
-        account_qs = Account.objects.filter(user=user, is_active=True).order_by("name")
+        account_qs = Account.objects.filter(tenant=tenant, is_active=True).order_by("name")
         self.fields["account"].queryset = account_qs
 
         if "destination_account" in self.fields:
@@ -100,7 +103,7 @@ class TransactionForm(forms.ModelForm):
             self.fields["destination_account"].required = False
 
         if "category" in self.fields:
-            self.fields["category"].queryset = Category.objects.filter(user=user).order_by(
+            self.fields["category"].queryset = Category.objects.filter(tenant=tenant).order_by(
                 "category_type", "name"
             )
             self.fields["category"].required = False
@@ -263,12 +266,13 @@ class StatementFilterForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
+        tenant = resolve_tenant(tenant=kwargs.pop("tenant", None), user=user)
         super().__init__(*args, **kwargs)
 
         self.fields["account"].queryset = Account.objects.filter(
-            user=user, is_active=True
+            tenant=tenant, is_active=True
         ).order_by("name")
-        self.fields["category"].queryset = Category.objects.filter(user=user).order_by(
+        self.fields["category"].queryset = Category.objects.filter(tenant=tenant).order_by(
             "category_type", "name"
         )
         self.fields["order_by"].initial = self.ORDER_CHOICES[0][0]

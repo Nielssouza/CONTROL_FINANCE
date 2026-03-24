@@ -6,12 +6,21 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 
+from common.tenancy import assign_tenant
+
 
 class ShoppingList(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="shopping_lists",
+    )
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        on_delete=models.CASCADE,
+        related_name="shopping_lists",
+        null=True,
+        blank=True,
     )
     name = models.CharField("Lista", max_length=120)
     list_date = models.DateField("Data da lista", default=timezone.localdate)
@@ -25,8 +34,8 @@ class ShoppingList(models.Model):
         verbose_name_plural = "Listas de compra"
         constraints = [
             models.UniqueConstraint(
-                fields=("user", "name"),
-                name="unique_shopping_list_name_per_user",
+                fields=("tenant", "name"),
+                name="unique_shopping_list_name_per_tenant",
             )
         ]
 
@@ -49,12 +58,23 @@ class ShoppingList(models.Model):
                 total += item.estimated_total
         return total.quantize(Decimal("0.01"))
 
+    def save(self, *args, **kwargs):
+        assign_tenant(self)
+        return super().save(*args, **kwargs)
+
 
 class ShoppingItem(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="shopping_items",
+    )
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        on_delete=models.CASCADE,
+        related_name="shopping_items",
+        null=True,
+        blank=True,
     )
     shopping_list = models.ForeignKey(
         ShoppingList,
@@ -87,12 +107,12 @@ class ShoppingItem(models.Model):
         verbose_name_plural = "Itens de compra"
         indexes = [
             models.Index(
-                fields=("user", "shopping_list", "is_purchased", "updated_at"),
-                name="shop_item_user_list_idx",
+                fields=("tenant", "shopping_list", "is_purchased", "updated_at"),
+                name="shop_item_tenant_list_idx",
             ),
             models.Index(
-                fields=("user", "created_at"),
-                name="shopping_sh_user_id_a6a311_idx",
+                fields=("tenant", "created_at"),
+                name="shopping_sh_tenant_id_idx",
             ),
         ]
 
@@ -110,10 +130,12 @@ class ShoppingItem(models.Model):
         self.purchased_at = timezone.now() if self.is_purchased else None
 
     def clean(self):
-        if self.shopping_list and self.shopping_list.user_id != self.user_id:
-            raise ValidationError({"shopping_list": "Lista invalida para este usuario."})
+        assign_tenant(self)
+        if self.shopping_list and self.shopping_list.tenant_id != self.tenant_id:
+            raise ValidationError({"shopping_list": "Lista invalida para este cliente."})
 
     def save(self, *args, **kwargs):
+        assign_tenant(self)
         if self.is_purchased and self.purchased_at is None:
             self.purchased_at = timezone.now()
         if not self.is_purchased:
