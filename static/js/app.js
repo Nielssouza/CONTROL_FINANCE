@@ -7,7 +7,7 @@
         currency: "BRL",
     });
 
-    const VIEW_MODE_KEY = "control_view_mode";
+    const VIEW_MODE_KEY = "nexo_view_mode";
     const VIEW_MODE_MOBILE = "mobile";
     const VIEW_MODE_BROWSER = "browser";
 

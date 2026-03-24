@@ -188,3 +188,29 @@ class DashboardPostLoginLoaderTests(TestCase):
         self.assertEqual(second_home.status_code, 200)
         self.assertFalse(second_home.context["show_post_login_loader"])
 
+
+class DashboardPublicLandingTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="landing-user",
+            password="landing-pass-123",
+        )
+
+    def test_home_renders_public_landing_for_anonymous_user(self):
+        response = self.client.get(reverse("dashboard:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "dashboard/landing.html")
+        self.assertContains(response, "Controle contas, metas e compras em um fluxo simples.")
+        self.assertContains(response, reverse("users:login"))
+
+    def test_home_keeps_dashboard_for_authenticated_user(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("dashboard:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "dashboard/home.html")
+        self.assertNotContains(response, "Financeiro pessoal, sem planilha")
+

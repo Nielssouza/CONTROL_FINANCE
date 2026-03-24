@@ -1,12 +1,12 @@
 ﻿{% extends "base.html" %}
 
-{% block title %}Entrar | Control{% endblock %}
+{% block title %}Entrar | Nexo{% endblock %}
 
 {% block content %}
 <div id="login-loader-overlay" class="login-loader-overlay" role="status" aria-live="polite" aria-label="Carregando tela de login">
     <div class="login-loader-card">
         <div class="login-loader-orb" aria-hidden="true"></div>
-        <p class="login-loader-title">Control</p>
+        <p class="login-loader-title">Nexo</p>
         <p class="login-loader-step" id="login-loader-step">Iniciando sessao segura...</p>
         <div class="login-loader-progress" aria-hidden="true">
             <span id="login-loader-bar"></span>
@@ -60,7 +60,7 @@
             "Pronto para entrar.",
         ];
 
-        const seenKey = "control_login_loader_seen_at";
+        const seenKey = "nexo_login_loader_seen_at";
         const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
         let shortMode = false;

@@ -1,8 +1,8 @@
 {% load static %}
 {
-    "name": "Control",
-    "short_name": "Control",
-    "description": "Controle pessoal de Control com foco em uso mobile.",
+    "name": "Nexo",
+    "short_name": "Nexo",
+    "description": "Gestao financeira pessoal do Nexo com foco em uso mobile.",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#000000",

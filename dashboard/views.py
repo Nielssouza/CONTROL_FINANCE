@@ -325,9 +325,23 @@ class DashboardContextMixin(LoginRequiredMixin):
 
 class DashboardHomeView(DashboardContextMixin, TemplateView):
     template_name = "dashboard/home.html"
+    public_template_name = "dashboard/landing.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.show_public_landing = not request.user.is_authenticated
+        if self.show_public_landing:
+            return TemplateView.dispatch(self, request, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_template_names(self):
+        if getattr(self, "show_public_landing", False):
+            return [self.public_template_name]
+        return [self.template_name]
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+        context = TemplateView.get_context_data(self, **kwargs)
+        if getattr(self, "show_public_landing", False):
+            return context
         context.update(self.get_dashboard_context())
         context["show_post_login_loader"] = bool(
             self.request.session.pop("show_post_login_loader", False)

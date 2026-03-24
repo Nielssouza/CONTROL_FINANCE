@@ -7,8 +7,8 @@
     <meta name="theme-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Control">
-    <title>{% block title %}Control{% endblock %}</title>
+    <meta name="apple-mobile-web-app-title" content="Nexo">
+    <title>{% block title %}Nexo{% endblock %}</title>
     <link rel="icon" href="{% static 'icons/favicon.png' %}?v=20260323d" type="image/png">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-512.png' %}?v=20260323d">
 
@@ -39,14 +39,14 @@
     <div id="app-open-loader" class="app-open-loader-overlay" aria-hidden="true">
         <div class="app-open-loader-mark">
             <span class="app-open-loader-ring"></span>
-            <span class="app-open-loader-label">Control</span>
+            <span class="app-open-loader-label">Nexo</span>
         </div>
     </div>
     <div class="mx-auto flex min-h-screen w-full flex-col app-shell-frame {% block shell_class %}app-shell{% endblock %}">
         {% block page_header %}
         <header class="app-header">
             <div class="flex items-center justify-between">
-                <a href="{% url 'dashboard:home' %}" class="app-brand">Control</a>
+                <a href="{% url 'dashboard:home' %}" class="app-brand">Nexo</a>
                 <div class="flex items-center gap-2">
                     <button class="app-mini-btn app-mini-btn-view" type="button" data-view-mode-toggle aria-label="Alternar modo de visualizacao">Modo navegador</button>
                     {% if user.is_authenticated %}
