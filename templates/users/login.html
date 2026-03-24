@@ -43,6 +43,24 @@
 {% block extra_js %}
 <script>
     (function () {
+        const wasRestoredFromHistory = () => {
+            try {
+                const navigationEntries = window.performance && window.performance.getEntriesByType
+                    ? window.performance.getEntriesByType("navigation")
+                    : [];
+                const navigationEntry = navigationEntries[0];
+                return Boolean(navigationEntry && navigationEntry.type === "back_forward");
+            } catch {
+                return false;
+            }
+        };
+
+        window.addEventListener("pageshow", (event) => {
+            if (event.persisted || wasRestoredFromHistory()) {
+                window.location.reload();
+            }
+        });
+
         const overlay = document.getElementById("login-loader-overlay");
         const progressBar = document.getElementById("login-loader-bar");
         const progressText = document.getElementById("login-loader-percent");
