@@ -20,7 +20,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", () => {});
 {% else %}
-const CACHE_NAME = "finance-control-v3";
+const CACHE_NAME = "finance-control-v4";
 const STATIC_ASSETS = [
     "/manifest.json",
     "/static/css/app.css",

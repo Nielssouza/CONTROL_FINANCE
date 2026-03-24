@@ -32,7 +32,7 @@
             }, 300);
         };
 
-        const OPEN_LOADER_VISIBLE_MS = 2000;
+        const OPEN_LOADER_VISIBLE_MS = 2600;
         window.setTimeout(closeOpenLoader, OPEN_LOADER_VISIBLE_MS);
         window.addEventListener("pageshow", closeOpenLoader, { once: true });
     };
