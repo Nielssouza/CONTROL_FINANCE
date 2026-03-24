@@ -2748,6 +2748,8 @@ body {
     --mono-text: #ffffff;
     --mono-muted: rgba(255, 255, 255, 0.76);
     --mono-soft: rgba(255, 255, 255, 0.58);
+    --mono-button-bg: #ffffff;
+    --mono-button-text: #000000;
 }
 
 body,
@@ -2903,9 +2905,9 @@ body,
 .charts-floating-switch,
 .charts-segment-btn,
 .charts-segment-btn-active {
-    background: var(--mono-surface-alt) !important;
-    border: 1px solid var(--mono-border-strong) !important;
-    color: var(--mono-text) !important;
+    background: var(--mono-button-bg) !important;
+    border: 1px solid var(--mono-button-bg) !important;
+    color: var(--mono-button-text) !important;
     box-shadow: none !important;
 }
 
@@ -2915,9 +2917,9 @@ body,
 .dash-tab-active,
 .dash-tab-link[aria-current="page"],
 .charts-segment-btn-active {
-    background: rgba(255, 255, 255, 0.12) !important;
-    border-color: var(--mono-border-strong) !important;
-    color: var(--mono-text) !important;
+    background: var(--mono-button-bg) !important;
+    border-color: var(--mono-button-bg) !important;
+    color: var(--mono-button-text) !important;
     box-shadow: none !important;
 }
 
@@ -2941,6 +2943,33 @@ body,
 .txn-center-fab,
 .dash-center-fab {
     color: var(--mono-text) !important;
+}
+
+.nav-item-active,
+.txn-tab-active,
+.txn-tab-link[aria-current="page"],
+.dash-tab-active,
+.dash-tab-link[aria-current="page"],
+.charts-segment-btn-active,
+.app-top-action,
+.app-btn-primary,
+.app-btn-secondary,
+.app-btn-danger,
+.app-mini-btn,
+.app-mini-btn-view,
+.app-fab,
+.app-center-fab,
+.txn-center-fab,
+.dash-center-fab,
+.dash-manage-home-btn,
+.dash-user-menu-link,
+.dash-user-menu-logout,
+.dash-due-link,
+.charts-circle-btn,
+.charts-floating-switch,
+.charts-segment-btn,
+.shopping-quick-toggle {
+    color: var(--mono-button-text) !important;
 }
 
 .txn-item-icon-wrap,
@@ -2967,6 +2996,51 @@ body,
     background: rgba(255, 255, 255, 0.08) !important;
     border-color: var(--mono-border) !important;
     color: var(--mono-text) !important;
+}
+
+.shopping-quick-toggle {
+    background: var(--mono-button-bg) !important;
+    border-color: var(--mono-button-bg) !important;
+    color: var(--mono-button-text) !important;
+}
+
+.shopping-quick-toggle-box {
+    background: var(--mono-button-text) !important;
+    border-color: var(--mono-button-text) !important;
+    color: var(--mono-button-bg) !important;
+}
+
+.shopping-quick-toggle.is-checked {
+    background: var(--mono-button-bg) !important;
+    border-color: var(--mono-button-bg) !important;
+}
+
+.shopping-quick-toggle.is-checked .shopping-quick-toggle-box,
+.shopping-quick-toggle.is-checked .shopping-quick-toggle-text {
+    border-color: transparent !important;
+}
+
+.shopping-quick-toggle.is-checked .shopping-quick-toggle-box {
+    background: var(--mono-button-text) !important;
+    border-color: var(--mono-button-text) !important;
+    color: var(--mono-button-bg) !important;
+}
+
+.shopping-quick-toggle.is-checked .shopping-quick-toggle-text {
+    background: transparent !important;
+    color: var(--mono-button-text) !important;
+}
+
+.dash-gift-btn {
+    background: var(--mono-surface-alt) !important;
+    border: 1px solid var(--mono-border-strong) !important;
+    color: var(--mono-text) !important;
+    box-shadow: none !important;
+}
+
+.dash-gift-dot {
+    background: #ffffff !important;
+    border-color: #000000 !important;
 }
 
 .shopping-quick-toggle-box svg {

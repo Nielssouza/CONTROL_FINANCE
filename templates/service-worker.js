@@ -20,8 +20,15 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", () => {});
 {% else %}
-const CACHE_NAME = "finance-control-v2";
-const STATIC_ASSETS = ["/manifest.json", "/static/css/app.css", "/static/js/app.js"];
+const CACHE_NAME = "finance-control-v3";
+const STATIC_ASSETS = [
+    "/manifest.json",
+    "/static/css/app.css",
+    "/static/js/app.js",
+    "/static/icons/favicon.png?v=20260323d",
+    "/static/icons/icon-192.png?v=20260323d",
+    "/static/icons/icon-512.png?v=20260323d",
+];
 
 self.addEventListener("install", (event) => {
     event.waitUntil(
