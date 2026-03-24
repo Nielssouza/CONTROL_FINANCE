@@ -3,8 +3,9 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView, LogoutView
 from django.shortcuts import redirect
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView
+from uuid import uuid4
 
 from users.forms import RegisterForm, StyledAuthenticationForm
 
@@ -37,4 +38,23 @@ class UserLoginView(LoginView):
 
 
 class UserLogoutView(LogoutView):
-    next_page = reverse_lazy("users:login")
+    def get_success_url(self):
+        return f"{reverse('users:login')}?logged_out={uuid4().hex}"
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        response["Cache-Control"] = "max-age=0, no-cache, no-store, must-revalidate, private"
+        response["Clear-Site-Data"] = '"cache"'
+        response.delete_cookie(
+            settings.CSRF_COOKIE_NAME,
+            path=settings.CSRF_COOKIE_PATH,
+            domain=settings.CSRF_COOKIE_DOMAIN,
+            samesite=settings.CSRF_COOKIE_SAMESITE,
+        )
+        response.delete_cookie(
+            settings.SESSION_COOKIE_NAME,
+            path=settings.SESSION_COOKIE_PATH,
+            domain=settings.SESSION_COOKIE_DOMAIN,
+            samesite=settings.SESSION_COOKIE_SAMESITE,
+        )
+        return response

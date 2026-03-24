@@ -43,6 +43,69 @@
 {% block extra_js %}
 <script>
     (function () {
+        const loginForm = document.getElementById("login-form");
+        const usernameInput = document.querySelector('input[name="username"]');
+        const passwordInput = document.querySelector('input[name="password"]');
+        const isLoggedOutState = new URLSearchParams(window.location.search).has("logged_out");
+
+        const withInputList = (callback) => {
+            [usernameInput, passwordInput].forEach((input) => {
+                if (input instanceof HTMLInputElement) {
+                    callback(input);
+                }
+            });
+        };
+
+        const scrubLoginFields = () => {
+            if (loginForm instanceof HTMLFormElement) {
+                loginForm.reset();
+            }
+
+            withInputList((input) => {
+                input.value = "";
+                input.defaultValue = "";
+            });
+        };
+
+        const temporarilyBlockAutofill = () => {
+            if (!isLoggedOutState) {
+                return;
+            }
+
+            if (loginForm instanceof HTMLFormElement) {
+                loginForm.setAttribute("autocomplete", "off");
+                window.setTimeout(() => {
+                    loginForm.removeAttribute("autocomplete");
+                }, 900);
+            }
+
+            withInputList((input) => {
+                const originalAutocomplete = input.getAttribute("autocomplete");
+                input.readOnly = true;
+                input.setAttribute("autocomplete", "off");
+
+                window.setTimeout(() => {
+                    input.readOnly = false;
+                    if (originalAutocomplete === null) {
+                        input.removeAttribute("autocomplete");
+                    } else {
+                        input.setAttribute("autocomplete", originalAutocomplete);
+                    }
+                }, 900);
+            });
+        };
+
+        if (isLoggedOutState) {
+            scrubLoginFields();
+            temporarilyBlockAutofill();
+            window.setTimeout(scrubLoginFields, 180);
+            window.setTimeout(scrubLoginFields, 720);
+
+            if (navigator.credentials && navigator.credentials.preventSilentAccess) {
+                navigator.credentials.preventSilentAccess().catch(function () {});
+            }
+        }
+
         const wasRestoredFromHistory = () => {
             try {
                 const navigationEntries = window.performance && window.performance.getEntriesByType
@@ -98,7 +161,6 @@
             overlay.classList.add("is-exiting");
             window.setTimeout(() => {
                 overlay.remove();
-                const usernameInput = document.querySelector('input[name="username"]');
                 if (usernameInput instanceof HTMLElement) {
                     usernameInput.focus();
                 }
