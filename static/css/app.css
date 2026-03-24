@@ -1971,28 +1971,41 @@ body {
 .dash-user-menu-panel {
     position: absolute;
     right: 0;
-    top: 3.35rem;
+    top: 3.55rem;
     z-index: 40;
-    min-width: 11rem;
-    border-radius: 1rem;
+    display: grid;
+    gap: 0.35rem;
+    min-width: 13.4rem;
+    border-radius: 1.3rem;
     border: 1px solid rgba(100, 116, 139, 0.4);
     background: linear-gradient(185deg, #1a1d27 0%, #151925 100%);
-    padding: 0.8rem;
-    box-shadow: 0 16px 30px -22px rgba(2, 8, 22, 0.95);
+    padding: 1.15rem 1.05rem 1.1rem;
+    box-shadow: 0 18px 34px -24px rgba(2, 8, 22, 0.95);
 }
 
 .dash-user-menu-name {
     margin: 0;
     color: #f8fafc;
-    font-size: 0.88rem;
+    font-size: 0.94rem;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.25;
 }
 
 .dash-user-menu-meta {
-    margin: 0.2rem 0 0.65rem;
+    margin: 0;
     color: rgba(203, 213, 225, 0.82);
     font-size: 0.74rem;
+    line-height: 1.35;
+}
+
+.dash-user-menu-actions {
+    display: grid;
+    gap: 0.68rem;
+    margin-top: 0.45rem;
+}
+
+.dash-user-menu-panel form {
+    margin: 0;
 }
 
 .dash-user-menu-link,
@@ -2005,13 +2018,13 @@ body {
     color: #e2e8f0;
     text-decoration: none;
     text-align: center;
-    font-size: 0.82rem;
+    font-size: 0.84rem;
     font-weight: 600;
-    padding: 0.55rem 0.7rem;
+    padding: 0.84rem 1rem;
 }
 
 .dash-user-menu-logout {
-    margin-top: 0.45rem;
+    margin-top: 0;
     background: rgba(190, 24, 93, 0.28);
     color: #fecdd3;
     cursor: pointer;
