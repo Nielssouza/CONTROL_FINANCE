@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from finance_control.views import ManifestView, ServiceWorkerView
+from nexo.views import ManifestView, ServiceWorkerView
 
 urlpatterns = [
     path('admin/', admin.site.urls),

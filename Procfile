@@ -1,2 +1,2 @@
 release: python manage.py migrate --noinput
-web: gunicorn finance_control.wsgi --log-file -
+web: gunicorn nexo.wsgi --log-file -

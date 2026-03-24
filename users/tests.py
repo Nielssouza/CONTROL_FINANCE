@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from users.forms import StyledAuthenticationForm
+
 
 class UserAuthFlowTests(TestCase):
     def setUp(self):
@@ -17,6 +19,8 @@ class UserAuthFlowTests(TestCase):
         self.assertIn("no-store", response.headers.get("Cache-Control", ""))
         self.assertContains(response, 'window.addEventListener("pageshow"')
         self.assertContains(response, "window.location.reload()")
+        self.assertContains(response, 'autocomplete="username"')
+        self.assertContains(response, 'autocomplete="current-password"')
 
     def test_logout_redirect_disables_cache(self):
         self.client.force_login(self.user)
@@ -44,3 +48,13 @@ class UserAuthFlowTests(TestCase):
             {"username": "auth-user", "password": "strong-pass-123"},
         )
         self.assertRedirects(second_login, reverse("dashboard:home"))
+
+    def test_auth_form_preserves_mobile_friendly_login_attributes(self):
+        form = StyledAuthenticationForm()
+
+        self.assertEqual(form.fields["username"].widget.attrs.get("autocomplete"), "username")
+        self.assertEqual(form.fields["username"].widget.attrs.get("autocapitalize"), "none")
+        self.assertEqual(form.fields["username"].widget.attrs.get("autocorrect"), "off")
+        self.assertEqual(form.fields["password"].widget.attrs.get("autocomplete"), "current-password")
+        self.assertEqual(form.fields["password"].widget.attrs.get("autocapitalize"), "none")
+        self.assertFalse(form.fields["password"].strip)

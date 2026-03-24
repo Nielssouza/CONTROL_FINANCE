@@ -1,4 +1,4 @@
-"""Django settings for finance_control project."""
+"""Django settings for nexo project."""
 
 import os
 import sys
@@ -78,7 +78,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "finance_control.urls"
+ROOT_URLCONF = "nexo.urls"
 
 TEMPLATES = [
     {
@@ -91,13 +91,13 @@ TEMPLATES = [
                 "django.template.context_processors.debug",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "finance_control.context_processors.app_flags",
+                "nexo.context_processors.app_flags",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = "finance_control.wsgi.application"
+WSGI_APPLICATION = "nexo.wsgi.application"
 
 
 use_sqlite = env_bool("USE_SQLITE", default=False)
