@@ -44,9 +44,15 @@ ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", _allowed_hosts_default)
 if HEROKU_DYNO and ".herokuapp.com" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(".herokuapp.com")
 
+default_primary_host = "nexo.dscorp.top"
+if default_primary_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(default_primary_host)
+
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 if HEROKU_DYNO and not any("herokuapp.com" in origin for origin in CSRF_TRUSTED_ORIGINS):
     CSRF_TRUSTED_ORIGINS.append("https://*.herokuapp.com")
+if f"https://{default_primary_host}" not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{default_primary_host}")
 
 PUBLIC_SIGNUP_ENABLED = env_bool("PUBLIC_SIGNUP_ENABLED", default=False)
 
@@ -161,7 +167,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-ALLOWED_HOSTS = ["nexo.dscorp.top"]
 LANGUAGE_CODE = "pt-br"
 
 TIME_ZONE = "America/Sao_Paulo"
@@ -192,6 +197,10 @@ STORAGES = {
 LOGIN_URL = "users:login"
 LOGIN_REDIRECT_URL = "dashboard:home"
 LOGOUT_REDIRECT_URL = "users:login"
+AUTHENTICATION_BACKENDS = [
+    "users.backends.EmailOnlyBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 
 # Production security defaults (override via env when needed)

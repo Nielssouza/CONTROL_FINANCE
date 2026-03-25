@@ -26,7 +26,7 @@ class RegisterView(CreateView):
         self.object.save()
         messages.success(
             self.request,
-            "Cadastro enviado com sucesso. Aguarde a validacao do administrador para acessar.",
+            "Cadastro enviado com sucesso. Aguarde a validacao do administrador e depois entre com o mesmo e-mail cadastrado.",
         )
         return redirect(self.get_success_url())
 

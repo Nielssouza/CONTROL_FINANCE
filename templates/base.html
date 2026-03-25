@@ -50,7 +50,7 @@
                 <div class="flex items-center gap-2">
                     <button class="app-mini-btn app-mini-btn-view" type="button" data-view-mode-toggle aria-label="Alternar modo de visualizacao">Modo navegador</button>
                     {% if user.is_authenticated %}
-                        <span class="app-user-chip">{{ user.username }}</span>
+                        <span class="app-user-chip">{{ user.get_full_name|default:user.email|default:user.username }}</span>
                         <form method="post" action="{% url 'users:logout' %}">
                             {% csrf_token %}
                             <button class="app-mini-btn" type="submit">Sair</button>

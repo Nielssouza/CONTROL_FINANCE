@@ -168,13 +168,14 @@ class DashboardPostLoginLoaderTests(TestCase):
         user_model = get_user_model()
         self.user = user_model.objects.create_user(
             username="login-loader-user",
+            email="login-loader-user@example.com",
             password="strong-pass-123",
         )
 
     def test_post_login_loader_flag_is_consumed_once(self):
         response = self.client.post(
             reverse("users:login"),
-            {"username": "login-loader-user", "password": "strong-pass-123"},
+            {"username": "login-loader-user@example.com", "password": "strong-pass-123"},
             follow=False,
         )
         self.assertEqual(response.status_code, 302)

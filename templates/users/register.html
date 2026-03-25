@@ -6,13 +6,20 @@
 <section class="app-page mx-auto mt-6 max-w-md space-y-5">
     <div>
         <h1 class="app-title">Criar conta</h1>
-        <p class="app-subtitle">Seu acesso sera liberado apos validacao do administrador.</p>
+        <p class="app-subtitle">Cadastro individual por e-mail, com liberacao apos validacao do administrador.</p>
+    </div>
+
+    <div class="card space-y-2">
+        <p class="app-field-label">Como funciona o cadastro</p>
+        <p class="app-muted-text">1 cadastro por e-mail.</p>
+        <p class="app-muted-text">O administrador revisa e ativa seu acesso.</p>
+        <p class="app-muted-text">Depois da aprovacao, o login e feito com esse mesmo e-mail.</p>
     </div>
 
     <form method="post" class="card space-y-4">
         {% include "partials/form_fields.html" %}
         <button type="submit" class="app-btn-primary w-full">
-            Cadastrar
+            Solicitar cadastro
         </button>
     </form>
 

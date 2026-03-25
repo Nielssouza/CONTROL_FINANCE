@@ -12,6 +12,7 @@ class UserAuthFlowTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
             username="auth-user",
+            email="auth-user@example.com",
             password="strong-pass-123",
         )
 
@@ -26,6 +27,8 @@ class UserAuthFlowTests(TestCase):
         self.assertContains(response, 'autocomplete="current-password"')
         self.assertContains(response, "navigator.credentials.preventSilentAccess")
         self.assertContains(response, 'new URLSearchParams(window.location.search).has("logged_out")')
+        self.assertContains(response, "Entre com o e-mail aprovado no seu cadastro.")
+        self.assertContains(response, "Cadastros novos ficam pendentes ate validacao do administrador.")
 
     def test_logout_redirect_disables_cache(self):
         self.client.force_login(self.user)
@@ -51,7 +54,7 @@ class UserAuthFlowTests(TestCase):
 
         first_login = self.client.post(
             login_url,
-            {"username": "auth-user", "password": "strong-pass-123"},
+            {"username": "auth-user@example.com", "password": "strong-pass-123"},
         )
         self.assertRedirects(first_login, reverse("dashboard:home"))
 
@@ -62,9 +65,19 @@ class UserAuthFlowTests(TestCase):
 
         second_login = self.client.post(
             login_url,
-            {"username": "auth-user", "password": "strong-pass-123"},
+            {"username": "auth-user@example.com", "password": "strong-pass-123"},
         )
         self.assertRedirects(second_login, reverse("dashboard:home"))
+
+    def test_login_rejects_username_when_email_is_required(self):
+        response = self.client.post(
+            reverse("users:login"),
+            {"username": "auth-user", "password": "strong-pass-123"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(response.context["form"], "username", "Informe um endereço de email válido.")
+        self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_auth_form_preserves_mobile_friendly_login_attributes(self):
         form = StyledAuthenticationForm()
@@ -72,6 +85,7 @@ class UserAuthFlowTests(TestCase):
         self.assertEqual(form.fields["username"].widget.attrs.get("autocomplete"), "username")
         self.assertEqual(form.fields["username"].widget.attrs.get("autocapitalize"), "none")
         self.assertEqual(form.fields["username"].widget.attrs.get("autocorrect"), "off")
+        self.assertEqual(form.fields["username"].widget.attrs.get("inputmode"), "email")
         self.assertEqual(form.fields["password"].widget.attrs.get("autocomplete"), "current-password")
         self.assertEqual(form.fields["password"].widget.attrs.get("autocapitalize"), "none")
         self.assertFalse(form.fields["password"].strip)
@@ -81,7 +95,6 @@ class UserAuthFlowTests(TestCase):
         response = self.client.post(
             reverse("users:register"),
             {
-                "username": "pending-user",
                 "email": "pending@example.com",
                 "password1": "Strong-pass-123",
                 "password2": "Strong-pass-123",
@@ -89,11 +102,13 @@ class UserAuthFlowTests(TestCase):
             follow=True,
         )
 
-        created_user = get_user_model().objects.get(username="pending-user")
+        created_user = get_user_model().objects.get(email="pending@example.com")
 
         self.assertFalse(created_user.is_active)
+        self.assertEqual(created_user.email, "pending@example.com")
+        self.assertTrue(created_user.username)
         self.assertRedirects(response, reverse("users:login"))
-        self.assertContains(response, "Aguarde a validacao do administrador")
+        self.assertContains(response, "entre com o mesmo e-mail cadastrado")
         self.assertNotIn("_auth_user_id", self.client.session)
 
     @override_settings(PUBLIC_SIGNUP_ENABLED=True)
@@ -107,7 +122,6 @@ class UserAuthFlowTests(TestCase):
         response = self.client.post(
             reverse("users:register"),
             {
-                "username": "new-user",
                 "email": "DUP@example.com",
                 "password1": "Strong-pass-123",
                 "password2": "Strong-pass-123",
@@ -127,7 +141,7 @@ class UserAuthFlowTests(TestCase):
 
         response = self.client.post(
             reverse("users:login"),
-            {"username": pending_user.username, "password": "Strong-pass-123"},
+            {"username": pending_user.email, "password": "Strong-pass-123"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -165,3 +179,12 @@ class UserAuthFlowTests(TestCase):
         self.assertTrue(pending_user.is_active)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "cadastro(s) validado(s) e ativado(s)")
+
+    @override_settings(PUBLIC_SIGNUP_ENABLED=True)
+    def test_register_page_explains_email_signup_flow(self):
+        response = self.client.get(reverse("users:register"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cadastro individual por e-mail")
+        self.assertContains(response, "1 cadastro por e-mail.")
+        self.assertContains(response, "Depois da aprovacao, o login e feito com esse mesmo e-mail.")
