@@ -54,7 +54,10 @@ if HEROKU_DYNO and not any("herokuapp.com" in origin for origin in CSRF_TRUSTED_
 if f"https://{default_primary_host}" not in CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS.append(f"https://{default_primary_host}")
 
-PUBLIC_SIGNUP_ENABLED = env_bool("PUBLIC_SIGNUP_ENABLED", default=False)
+PUBLIC_SIGNUP_ENABLED = env_bool(
+    "PUBLIC_SIGNUP_ENABLED",
+    default=RUNSERVER and (not TESTING) and (not HEROKU_DYNO),
+)
 
 
 INSTALLED_APPS = [

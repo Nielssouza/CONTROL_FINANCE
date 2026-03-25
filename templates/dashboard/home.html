@@ -174,10 +174,10 @@
 
                 <div class="dash-user-menu-panel hidden" id="dash-user-menu-panel" role="menu">
                     <p class="dash-user-menu-name">{{ user.get_full_name|default:user.email|default:user.username }}</p>
-                    <p class="dash-user-menu-meta">Sessao ativa</p>
+                    <p class="dash-user-menu-meta">{{ user.email|default:"Sessao ativa" }}</p>
                     <div class="dash-user-menu-actions">
                         {% if user.is_staff %}
-                            <a href="{% url 'admin:index' %}" class="dash-user-menu-link">Admin</a>
+                            <a href="{% url 'admin:index' %}" class="dash-user-menu-link">Painel admin</a>
                         {% endif %}
                         <button type="button" class="dash-user-menu-link" data-view-mode-toggle>Modo navegador</button>
                         <form method="post" action="{% url 'users:logout' %}">
