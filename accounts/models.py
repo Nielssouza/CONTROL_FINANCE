@@ -11,7 +11,7 @@ class Account(models.Model):
     class AccountType(models.TextChoices):
         BANK = "bank", "Banco"
         CASH = "cash", "Dinheiro"
-        CARD = "card", "Cartao"
+        CARD = "card", "Cartão"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -43,7 +43,7 @@ class Account(models.Model):
         default=True,
         help_text=(
             "Desmarque para contas que nao devem compor os saldos "
-            "consolidados, como cartao de credito."
+            "consolidados, como cartão de crédito."
         ),
     )
     is_active = models.BooleanField("Ativa", default=True)

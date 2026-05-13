@@ -1,9 +1,11 @@
 import json
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import F, Q
+from django.db.models import F, Q, Sum
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -12,6 +14,7 @@ from django.utils.formats import date_format
 from django.views import View
 from django.views.generic import CreateView, DeleteView, TemplateView, UpdateView
 
+from accounts.models import Account
 from common.balance import calculate_monthly_balance, calculate_user_balance
 from common.mixins import UserAssignMixin, UserQuerySetMixin
 from transactions.forms import QuickTransactionForm, StatementFilterForm, TransactionForm
@@ -387,7 +390,22 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
             tenant=tenant,
         )
 
-        return current_balance, monthly_balance
+        credit_card_expenses = Transaction.objects.filter(
+            tenant=tenant,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            account__account_type=Account.AccountType.CARD,
+            is_ignored=False,
+            date__year=selected_month.year,
+            date__month=selected_month.month,
+        )
+        if category:
+            credit_card_expenses = credit_card_expenses.filter(category=category)
+
+        credit_card_expense_total = credit_card_expenses.aggregate(
+            total=Coalesce(Sum("amount"), Decimal("0.00"))
+        )["total"]
+
+        return current_balance, monthly_balance, credit_card_expense_total
 
     def get_filtered_transactions(self, form, selected_month):
         queryset = Transaction.objects.filter(tenant=self.request.tenant).select_related(
@@ -404,7 +422,9 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
             selected_month
         )
         transactions = self.get_filtered_transactions(form, selected_month)
-        current_balance, monthly_balance = self.get_balances(form, selected_month)
+        current_balance, monthly_balance, credit_card_expense_total = self.get_balances(
+            form, selected_month
+        )
 
         query_params = self.request.GET.copy()
         query_params["month"] = selected_month_value
@@ -421,6 +441,7 @@ class StatementViewBase(LoginRequiredMixin, TemplateView):
         context["selected_category_id"] = self.request.GET.get("category", "")
         context["current_balance"] = current_balance
         context["monthly_balance"] = monthly_balance
+        context["credit_card_expense_total"] = credit_card_expense_total
         context["statement_return_url"] = (
             f"{reverse('transactions:statement')}?{query_params.urlencode()}"
         )

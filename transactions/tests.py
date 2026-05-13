@@ -710,6 +710,58 @@ class TransactionScopeAndMonthLockTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["monthly_balance"], Decimal("0.00"))
 
+    def test_statement_balance_shows_selected_month_credit_card_expense_total(self):
+        card_account = Account.objects.create(
+            user=self.user,
+            name="Cartao extrato",
+            account_type=Account.AccountType.CARD,
+            initial_balance=Decimal("0.00"),
+            is_active=True,
+            include_in_balance=False,
+        )
+        expense_category = Category.objects.create(
+            user=self.user,
+            name="Cartao extrato",
+            category_type=Category.CategoryType.EXPENSE,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("750.05"),
+            date=date(2026, 2, 10),
+            account=card_account,
+            category=expense_category,
+            description="Compra no cartao",
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("99.00"),
+            date=date(2026, 1, 10),
+            account=card_account,
+            category=expense_category,
+            description="Compra fora do mes",
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal("50.00"),
+            date=date(2026, 2, 12),
+            account=self.account,
+            category=expense_category,
+            description="Compra no banco",
+            recurrence_type=Transaction.RecurrenceType.ONCE,
+        )
+
+        response = self.client.get(reverse("transactions:statement"), {"month": "2026-02"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["credit_card_expense_total"], Decimal("750.05"))
+        self.assertContains(response, "Cartão")
+        self.assertContains(response, "R$ 750,05")
+
     def test_toggle_cleared_with_htmx_returns_redirect_header(self):
         response = self.client.post(
             reverse("transactions:toggle-cleared", args=[self.feb.pk]),

@@ -218,7 +218,7 @@ class DashboardChartsMonthScopeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["credit_card_expense_total"], Decimal("200.50"))
         self.assertEqual(response.context["credit_card_expense_count"], 2)
-        self.assertContains(response, "Despesas no cartao")
+        self.assertContains(response, "Despesas no cartão")
         self.assertContains(response, "R$ 200,50")
 
 class DashboardPostLoginLoaderTests(TestCase):
