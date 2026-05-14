@@ -422,6 +422,18 @@
         });
     }
 
+    document.body.addEventListener("htmx:beforeRequest", (event) => {
+        const trigger = event.detail && event.detail.elt;
+        if (!(trigger instanceof HTMLElement)) {
+            return;
+        }
+
+        const targetSelector = trigger.getAttribute("hx-target");
+        if (targetSelector === "#modal-content") {
+            closeTransactionActionMenus();
+        }
+    });
+
     document.body.addEventListener("htmx:afterSwap", (event) => {
         if (event.detail && event.detail.target) {
             initCurrencyMasks(event.detail.target);
@@ -439,6 +451,7 @@
             && event.detail.target.id === "modal-content"
             && modalContent.innerHTML.trim()
         ) {
+            closeTransactionActionMenus();
             openModal();
         }
     });
